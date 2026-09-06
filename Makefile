@@ -7,6 +7,9 @@ RELEASE_DIR = release
 build:
 	go build -o $(BUILD_DIR)/$(EXECUTABLE)
 
+build-mos: build
+	cp bin/gdiff ~/.local/bin/gdiff
+
 run: build
 	./$(BUILD_DIR)/$(EXECUTABLE)
 

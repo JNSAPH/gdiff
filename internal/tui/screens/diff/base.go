@@ -1,16 +1,14 @@
 package diffview
 
 // diffBase identifies which ref the diff pane compares the worktree
-// against: the last accepted checkpoint, or the last real commit.
-// baseCheckpoint is the zero value — the screen starts there, since that's
-// the view accept/reject actually affect. A fresh checkpoint starts out
-// equal to HEAD, so this changes nothing about what's shown until the first
-// accept.
+// against: the last real commit, or the last accepted checkpoint.
+// baseHead is the zero value — the screen starts there; press b to switch
+// into checkpoint mode before accept/reject do anything.
 type diffBase int
 
 const (
-	baseCheckpoint diffBase = iota
-	baseHead
+	baseHead diffBase = iota
+	baseCheckpoint
 )
 
 // label names the base for the header segment.
