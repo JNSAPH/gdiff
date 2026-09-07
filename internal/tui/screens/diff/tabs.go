@@ -11,8 +11,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// tabBarHeight is how many rows the tab strip takes: the tabs and the
-// divider that carries the sort state, mirroring the sidebar's header.
+// tabBarHeight is the tabs plus the divider carrying the sort state.
 const tabBarHeight = 2
 
 // Overflow markers, shown when the strip can't hold every tab.
@@ -21,13 +20,11 @@ const (
 	moreRight = "›"
 )
 
-// tabChrome is the columns a tab spends on everything but the name: the
-// accent bar, the change glyph and the space either side of it.
+// tabChrome is what a tab spends on everything but the name.
 const tabChrome = 4
 
-// layoutMode is how the file list is laid out. Auto follows the window's
-// width and is where the screen starts; the other two are the toggle key
-// pinning one layout.
+// layoutMode is how the file list is laid out. Auto follows the window's width;
+// the other two are the toggle key pinning one.
 type layoutMode int
 
 const (
@@ -36,11 +33,9 @@ const (
 	layoutSidebar
 )
 
-// narrow reports whether the file list shows as a tab strip on top rather
-// than a sidebar beside the diff.
+// narrow reports whether the list shows as a tab strip rather than a sidebar.
 func (m Model) narrow() bool {
-	// Tabs regardless of the mode: there isn't room here for a sidebar and
-	// a readable diff next to it.
+	// No room here for a sidebar and a readable diff beside it.
 	if m.width < minSidebarWidth+minStatusWidth {
 		return true
 	}
@@ -55,8 +50,7 @@ func (m Model) narrow() bool {
 	}
 }
 
-// tabsHeight is the rows the tab strip costs the body, zero when the sidebar
-// is showing instead.
+// tabsHeight is what the strip costs the body, zero when the sidebar shows.
 func (m Model) tabsHeight() int {
 	if m.narrow() {
 		return tabBarHeight
@@ -64,22 +58,20 @@ func (m Model) tabsHeight() int {
 	return 0
 }
 
-// tabs renders the file list as a strip above the diff: the tabs themselves,
-// then the divider closing them off.
+// tabs renders the strip, then the divider closing it off.
 func (m Model) tabs(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, m.tabStrip(width), m.tabsDivider(width))
 }
 
-// tabStrip renders one row of tabs, windowed so the selected file is always
-// among them, with markers on either side for the ones that didn't fit.
+// tabStrip renders one row of tabs, windowed around the selected file,
+// with markers for the ones that didn't fit.
 func (m Model) tabStrip(width int) string {
 	if len(m.files) == 0 {
 		return clamp(styles.Muted.Render(" no files"), width)
 	}
 
-	// A name wider than the strip would be sliced mid-band by the clamp
-	// below, so it's cut to what's left once the chrome and both overflow
-	// markers have taken their columns.
+	// A name wider than the strip would be sliced mid-band by the clamp below,
+	// so it's cut to what the chrome and markers leave.
 	room := max(1, width-tabChrome-2)
 
 	labels := make([]string, len(m.files))
@@ -87,8 +79,7 @@ func (m Model) tabStrip(width int) string {
 		labels[i] = tabLabel(f, i == m.cursor, room)
 	}
 
-	// The markers cost two columns, so the window is re-cut to make room
-	// once it's clear the tabs don't all fit.
+	// The markers cost two columns, so the window is re-cut for them.
 	start, end := tabWindow(labels, m.cursor, width)
 	if start > 0 || end < len(labels) {
 		start, end = tabWindow(labels, m.cursor, width-2)
@@ -99,8 +90,7 @@ func (m Model) tabStrip(width int) string {
 		marker(moreRight, end < len(labels)), width)
 }
 
-// marker is an overflow arrow, or the blank column it would occupy, so the
-// tabs sit at the same offset either way.
+// marker is an overflow arrow, or the blank column it would occupy.
 func marker(glyph string, show bool) string {
 	if !show {
 		return " "
@@ -108,8 +98,7 @@ func marker(glyph string, show bool) string {
 	return styles.Subtle.Render(glyph)
 }
 
-// tabLabel is one tab: the change-type glyph and the file's base name,
-// wearing the selected row's band and accent bar while it's the current file.
+// tabLabel is the glyph and base name, in the selected band when current.
 func tabLabel(file git.FileChange, selected bool, room int) string {
 	s := styles.Row
 	bar := " "
@@ -123,8 +112,7 @@ func tabLabel(file git.FileChange, selected bool, room int) string {
 	return bar + glyph + s.Row.Render(" ") + s.Name.Render(truncateTail(baseName(file), room)) + s.Row.Render(" ")
 }
 
-// tabWindow is the run of tabs that fits in width with the cursor's tab in
-// it. It fills forward from the cursor first, then backwards with the rest.
+// tabWindow is the run of tabs that fits, filling forward from the cursor.
 func tabWindow(labels []string, cursor, width int) (start, end int) {
 	used := lipgloss.Width(labels[cursor])
 	start, end = cursor, cursor+1
@@ -150,9 +138,8 @@ func tabWindow(labels []string, cursor, width int) (start, end int) {
 	return start, end
 }
 
-// tabsDivider separates the tabs from the diff and carries the sort state and
-// cursor position the sidebar's header would show. It takes the accent color
-// when the tabs have focus, standing in for the sidebar's focused border.
+// tabsDivider carries the sort state and position the sidebar's header would
+// show, taking the accent color when the tabs have focus.
 func (m Model) tabsDivider(width int) string {
 	// Only two rows here, so the divider gives way to the input while typing.
 	if m.filtering {

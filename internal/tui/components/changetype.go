@@ -10,9 +10,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// ChangeTypeColor is the color representing a change type. Shared so a
-// change type looks the same wherever it's shown — a file list row, a
-// content header, a worktree's summary.
+// ChangeTypeColor is shared, so a change type looks the same wherever it shows.
 func ChangeTypeColor(t git.ChangeType) color.Color {
 	switch t {
 	case git.ChangeTypeNew:
@@ -26,8 +24,7 @@ func ChangeTypeColor(t git.ChangeType) color.Color {
 	}
 }
 
-// ChangeCounts summarizes counts as "+3 ~12 -1", leaving out any change type
-// that isn't present.
+// ChangeCounts is "+3 ~12 -1", leaving out any type that isn't present.
 func ChangeCounts(counts map[git.ChangeType]int) string {
 	out := ""
 	for _, t := range []git.ChangeType{git.ChangeTypeNew, git.ChangeTypeModified, git.ChangeTypeDeleted, git.ChangeTypeRenamed} {

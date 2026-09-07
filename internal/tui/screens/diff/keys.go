@@ -6,8 +6,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/global"
 )
 
-// keyMap is the screen's bindings. It implements help.KeyMap via ShortHelp
-// and FullHelp, so the footer's help bar renders straight from it.
+// keyMap is the screen's bindings, rendered straight into the help bar.
 type keyMap struct {
 	Up              key.Binding
 	Down            key.Binding
@@ -34,9 +33,8 @@ type keyMap struct {
 	// filterFocus narrows ShortHelp to the two keys that end the filter.
 	filterFocus bool
 
-	// checkpointFocus trims ShortHelp to the keys relevant to reviewing a
-	// checkpoint, dropping ones common enough elsewhere not to need a
-	// standing reminder. FullHelp ignores it — '?' still shows everything.
+	// checkpointFocus trims ShortHelp to the checkpoint keys. FullHelp ignores
+	// it, so "?" still shows everything.
 	checkpointFocus bool
 }
 
@@ -126,9 +124,7 @@ var keys = keyMap{
 	Quit:           global.Quit,
 }
 
-// ShortHelp returns the bindings shown in the collapsed, one-line help. In
-// checkpointFocus mode, Tab/SortMode/Refresh give way to the checkpoint
-// actions — they're still one "?" away in FullHelp.
+// ShortHelp returns the collapsed, one-line help.
 func (k keyMap) ShortHelp() []key.Binding {
 	if k.filterFocus {
 		return []key.Binding{k.FilterApply, k.FilterCancel}
@@ -150,14 +146,13 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	}
 }
 
-// activeKeys is the keymap as it applies right now. It feeds both the footer
-// and Update's dispatch, so a disabled binding neither shows nor fires.
+// activeKeys feeds both the footer and Update's dispatch, so a disabled
+// binding neither shows nor fires.
 func (m Model) activeKeys() keyMap {
 	k := keys
 	k.filterFocus = m.filtering
 
-	// The file list is either a sidebar or a tab strip, so only one pair of
-	// arrows moves through it at a time.
+	// Only one pair of arrows moves through the list, sidebar or tab strip.
 	narrow := m.narrow()
 	k.Up.SetEnabled(!narrow)
 	k.Down.SetEnabled(!narrow)
@@ -165,7 +160,7 @@ func (m Model) activeKeys() keyMap {
 	k.Right.SetEnabled(narrow)
 
 	// Accept/reject only mean something against a checkpoint, and the short
-	// help narrows to those keys rather than advertising ones that no-op.
+	// help narrows to them rather than advertising keys that no-op.
 	inCheckpoint := m.base == baseCheckpoint
 	k.Accept.SetEnabled(inCheckpoint)
 	k.AcceptAll.SetEnabled(inCheckpoint)

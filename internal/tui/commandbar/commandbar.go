@@ -20,8 +20,7 @@ type SubmitMsg struct {
 // CloseMsg is sent when the user cancels out of the command bar.
 type CloseMsg struct{}
 
-// Open resets and focuses the input. The router calls this when the command
-// bar is opened.
+// Open resets and focuses the input; the router calls it.
 func (m Model) Open() (Model, tea.Cmd) {
 	m.input.Reset()
 	return m, m.input.Focus()
@@ -47,8 +46,7 @@ func (m Model) View() string {
 	suggestions := m.input.MatchedSuggestions()
 	current := m.input.CurrentSuggestionIndex()
 
-	// Builds the list of matched commands, name left / description right,
-	// each in its own fixed-width column so every row lines up.
+	// Name left, description right, each in a fixed column so the rows line up.
 	nameWidth := styles.CommandBarInnerWidth - descColWidth
 	rows := make([]string, len(suggestions))
 	for i, s := range suggestions {
@@ -70,8 +68,8 @@ func (m Model) View() string {
 		),
 	)
 
-	// The box draws no top edge, so build that row by hand with the title
-	// in it. Its width has to match the body's, hence the measure.
+	// The box draws no top edge, so build that row by hand with the title in
+	// it. Its width has to match the body's, hence the measure.
 	firstLine, _, _ := strings.Cut(body, "\n")
 	label := styles.Title.Render(" Commands ")
 	borderStyle := lipgloss.NewStyle().Foreground(styles.FocusedBorderColor)

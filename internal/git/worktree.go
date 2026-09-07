@@ -14,9 +14,8 @@ type Worktree struct {
 	Branch string // short branch name, or a short commit hash when detached
 }
 
-// Worktrees lists the repository's linked working trees. go-git has no API
-// for this — the bookkeeping lives in .git/worktrees and git's own porcelain
-// format is the stable, intended way to read it — so this shells out.
+// Worktrees lists the linked working trees. go-git has no API for it, and
+// git's porcelain format is the intended way to read it, so this shells out.
 func (r *Repo) Worktrees() ([]Worktree, error) {
 	worktree, err := r.repo.Worktree()
 	if err != nil {
@@ -32,9 +31,8 @@ func (r *Repo) Worktrees() ([]Worktree, error) {
 	return parseWorktreeList(string(out)), nil
 }
 
-// parseWorktreeList reads `git worktree list --porcelain`'s output: entries
-// separated by blank lines, each a "worktree <path>" line followed by either
-// a "branch refs/heads/<name>" or a "detached" line.
+// parseWorktreeList reads `git worktree list --porcelain`: blank-line separated
+// entries, each a "worktree <path>" line plus a branch or detached line.
 func parseWorktreeList(out string) []Worktree {
 	var worktrees []Worktree
 	var current *Worktree
@@ -69,12 +67,8 @@ func parseWorktreeList(out string) []Worktree {
 	return worktrees
 }
 
-// ChangedFilesAt lists the uncommitted changes in the working tree rooted at
-// path, via `git status --porcelain`. Repo.ChangedFiles goes through go-git
-// instead, but go-git's Worktree().Status() misreads a linked worktree's own
-// index — it either misreports every tracked file as new or errors outright
-// on a detached HEAD — so this is the one that's safe to call on any
-// worktree, linked or not.
+// ChangedFilesAt lists uncommitted changes in the tree rooted at path. Safe on
+// any worktree, unlike go-git's Status(), which misreads a linked one's index.
 func ChangedFilesAt(path string) ([]FileChange, error) {
 	out, err := exec.Command("git", "-C", path, "status", "--porcelain").Output()
 	if err != nil {
@@ -84,10 +78,9 @@ func ChangedFilesAt(path string) ([]FileChange, error) {
 	return parsePorcelainStatus(string(out), false), nil
 }
 
-// ChangedFilesAgainst lists path's changes relative to ref instead of HEAD —
-// the checkpoint ref, in particular — including untracked files. Since
-// `git status`/`git diff` only ever compare against HEAD, this seeds a
-// scratch index from ref's tree and runs status against that instead.
+// ChangedFilesAgainst lists path's changes relative to ref, untracked files
+// included. status and diff only compare against HEAD, so this seeds a scratch
+// index from ref's tree and runs status against that.
 func ChangedFilesAgainst(path, ref string) ([]FileChange, error) {
 	tmpIndex, err := tempIndexPath()
 	if err != nil {
@@ -112,12 +105,9 @@ func ChangedFilesAgainst(path, ref string) ([]FileChange, error) {
 	return parsePorcelainStatus(string(out), true), nil
 }
 
-// parsePorcelainStatus reads `git status --porcelain`'s output: each line is
-// two status characters, a space, then the path (or "old -> new" for a
-// rename). worktreeColumnOnly picks the second character (worktree-vs-index)
-// unconditionally instead of preferring the first (index-vs-HEAD) — right
-// when the index was seeded from something other than HEAD, where the first
-// column is noise about ref-vs-HEAD rather than a real change.
+// parsePorcelainStatus reads `git status --porcelain`: two status characters,
+// a space, then the path. worktreeColumnOnly takes the second character always,
+// right when the index was seeded from something other than HEAD.
 func parsePorcelainStatus(out string, worktreeColumnOnly bool) []FileChange {
 	var changes []FileChange
 
@@ -134,8 +124,7 @@ func parsePorcelainStatus(out string, worktreeColumnOnly bool) []FileChange {
 				continue // no change relative to the seeded index
 			}
 		case code == ' ' || code == '?':
-			// A file can carry both a staged and an unstaged status (staged
-			// as modified, then modified again) — prefer whichever is set.
+			// A file can carry a staged and an unstaged status — take either.
 			code = line[1]
 		}
 

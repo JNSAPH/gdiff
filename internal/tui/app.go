@@ -1,5 +1,4 @@
-// Package tui is the app's root model. It owns the global chrome — header,
-// border, command bar — and routes messages to the active screen.
+// Package tui is the root model: it owns the global chrome and routes messages.
 package tui
 
 import (
@@ -10,6 +9,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/commandbar"
 	"github.com/JNSAPH/gdiff/internal/tui/components"
 	"github.com/JNSAPH/gdiff/internal/tui/global"
+	"github.com/JNSAPH/gdiff/internal/tui/screens/branches"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/splash"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/worktrees"
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
@@ -22,7 +22,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Global keys, unless something else owns the keyboard — "q" would quit.
+		// Global keys, unless something else owns the keyboard — "q" quits.
 		if !m.showCommandBar && !m.capturesInput() {
 			switch {
 			case key.Matches(msg, global.Quit):
@@ -42,7 +42,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.showDiffView()
 
 	case worktrees.SelectMsg:
-		return m.openWorktree(msg.Path)
+		return m.openDiffAt(msg.Path)
+
+	case branches.SwitchedMsg:
+		return m.openDiffAt(msg.Path)
 
 	case commandbar.CloseMsg:
 		return m.closeCommandBar()
@@ -51,9 +54,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.runCommand(msg.Value)
 	}
 
-	// The bar owns the keyboard while it's open, but only the keyboard.
-	// Routing everything to it drops whatever else is in flight — a screen
-	// never sees the result of a command it started before the bar opened.
+	// The bar owns the keyboard while it's open, but only the keyboard: routing
+	// everything to it would drop whatever else is in flight.
 	if m.showCommandBar {
 		var barCmd tea.Cmd
 		m.commandBar, barCmd = m.commandBar.Update(msg)
@@ -95,8 +97,7 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// activeScreen renders the active screen and reports what its title bar
-// should say.
+// activeScreen renders the active screen and reports its title bar.
 func (m Model) activeScreen() (title string, segments []string, body string) {
 	switch m.active {
 	case screenSplash:
@@ -105,14 +106,16 @@ func (m Model) activeScreen() (title string, segments []string, body string) {
 	case screenWorktrees:
 		title, segments = m.worktrees.HeaderContent()
 		return title, segments, m.worktrees.View()
+	case screenBranches:
+		title, segments = m.branches.HeaderContent()
+		return title, segments, m.branches.View()
 	default:
 		title, segments = m.diffView.HeaderContent()
 		return title, segments, m.diffView.View()
 	}
 }
 
-// overlayCommandBar centers the command bar popup in the bordered body,
-// which starts below the header and one column in from the border.
+// overlayCommandBar centers the popup below the header, inside the border.
 func (m Model) overlayCommandBar(content string) string {
 	box := m.commandBar.View()
 	boxW, boxH := lipgloss.Size(box)

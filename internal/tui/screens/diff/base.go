@@ -1,9 +1,7 @@
 package diffview
 
-// diffBase identifies which ref the diff pane compares the worktree
-// against: the last real commit, or the last accepted checkpoint.
-// baseHead is the zero value — the screen starts there; press b to switch
-// into checkpoint mode before accept/reject do anything.
+// diffBase is what the pane compares against: the last commit, or the last
+// checkpoint. baseHead is the zero value, so the screen starts there.
 type diffBase int
 
 const (
@@ -29,10 +27,8 @@ func (m Model) toggleBase() Model {
 	return m.refreshGit()
 }
 
-// AcceptSelectedFile moves just the selected file's current content into
-// the checkpoint, leaving every other pending file exactly as the
-// checkpoint already had it. A no-op outside checkpoint mode or with
-// nothing selected.
+// AcceptSelectedFile moves one file into the checkpoint, leaving every other
+// pending file as it was. A no-op outside checkpoint mode.
 func (m Model) AcceptSelectedFile() Model {
 	if m.base != baseCheckpoint || m.repo == nil {
 		return m
@@ -47,9 +43,8 @@ func (m Model) AcceptSelectedFile() Model {
 	return m.refreshGit()
 }
 
-// RejectSelectedFile restores just the selected file to the checkpoint,
-// discarding its own pending change. Destructive, and — like
-// RejectCheckpoint — a no-op outside checkpoint mode.
+// RejectSelectedFile restores one file to the checkpoint. Destructive, and a
+// no-op outside checkpoint mode.
 func (m Model) RejectSelectedFile() Model {
 	if m.base != baseCheckpoint || m.repo == nil {
 		return m
@@ -64,10 +59,8 @@ func (m Model) RejectSelectedFile() Model {
 	return m.refreshGit()
 }
 
-// AcceptCheckpoint moves the checkpoint ref to match the current working
-// tree — everything since the last checkpoint becomes the new baseline —
-// and reloads. A no-op outside checkpoint mode: accepting only makes sense
-// for the diff you're actually looking at.
+// AcceptCheckpoint makes the working tree the new baseline. A no-op outside
+// checkpoint mode: accepting only means something for the diff you're seeing.
 func (m Model) AcceptCheckpoint() Model {
 	if m.base != baseCheckpoint {
 		return m
@@ -80,9 +73,8 @@ func (m Model) AcceptCheckpoint() Model {
 	return m.refreshGit()
 }
 
-// RejectCheckpoint resets the working tree back to the last checkpoint,
-// discarding everything since, and reloads. Destructive, and — like
-// AcceptCheckpoint — a no-op outside checkpoint mode.
+// RejectCheckpoint resets the tree to the last checkpoint. Destructive, and a
+// no-op outside checkpoint mode.
 func (m Model) RejectCheckpoint() Model {
 	if m.base != baseCheckpoint {
 		return m

@@ -7,14 +7,13 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// Model holds the command bar's state. Its size is fixed (see
-// styles.CommandBarWidth) and the router positions it, so it tracks neither.
+// Model holds the command bar's state. Fixed size, router-positioned, so it
+// tracks neither.
 type Model struct {
 	input textinput.Model
 }
 
-// New builds the command bar, closed, with its input pre-loaded with the
-// command names as suggestions.
+// New builds the bar closed, its input pre-loaded with the command names.
 func New() Model {
 	input := textinput.New()
 	input.Prompt = ": "

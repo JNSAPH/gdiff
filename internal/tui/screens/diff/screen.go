@@ -1,5 +1,4 @@
-// Package diffview is the main screen: a sidebar listing changed files
-// next to a pane showing the selected file's diff.
+// Package diffview is the main screen: a file sidebar beside a diff pane.
 package diffview
 
 import (
@@ -17,8 +16,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// ScrollTickInterval is how often the selected row's marquee advances. The
-// router drives it, so the interval lives here but the timer does not.
+// ScrollTickInterval is the marquee's step. The router drives the timer.
 const ScrollTickInterval = 300 * time.Millisecond
 
 // focus identifies which pane has keyboard focus.
@@ -29,8 +27,7 @@ const (
 	focusContent
 )
 
-// Model is the diff screen's state: the repository, the files it found, and
-// the diff of whichever one the cursor is on.
+// Model is the diff screen's state: the repo, its files, and the current diff.
 type Model struct {
 	gitPath string
 	repo    *git.Repo
@@ -54,8 +51,8 @@ type Model struct {
 	filter    textinput.Model
 	filtering bool
 
-	// The selected file's diff, kept so the pane can be re-rendered on a
-	// resize without reading git again. When there's none, message says why.
+	// The current diff, kept so a resize re-renders without reading git. With
+	// none, message says why.
 	diffLines    []git.DiffLine
 	lineNumWidth int
 	message      string
@@ -65,8 +62,8 @@ type Model struct {
 	help          help.Model
 }
 
-// New opens the repository and loads its changed files. A failure goes to
-// loadErr and shows in the content pane, so the TUI can still start.
+// New opens the repository. A failure goes to loadErr and shows in the pane,
+// so the TUI can still start.
 func New(gitPath string) Model {
 	m := Model{
 		gitPath:  gitPath,
@@ -85,8 +82,8 @@ func New(gitPath string) Model {
 	return m.refreshGit() // calls EnsureCheckpoint too
 }
 
-// newViewport builds the diff pane. Soft wrap is off so a long line scrolls
-// sideways instead of wrapping and breaking the row's background band.
+// newViewport turns soft wrap off, so a long line scrolls sideways instead of
+// wrapping and breaking the row's band.
 func newViewport() viewport.Model {
 	vp := viewport.New()
 	vp.SoftWrap = false
@@ -96,8 +93,7 @@ func newViewport() viewport.Model {
 	return vp
 }
 
-// Init returns the commands the screen needs while it's active. The marquee
-// runs off the router's clock, not this screen's, so there are none.
+// Init has no commands: the marquee runs off the router's clock, not this one.
 func (m Model) Init() tea.Cmd {
 	return nil
 }
@@ -122,7 +118,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		k := m.activeKeys()
 
-		// The filter takes every key while focused, or typing "n" rejects a file.
+		// The filter takes every key while focused, or "n" rejects a file.
 		if m.filtering {
 			switch {
 			case key.Matches(msg, k.FilterApply):
@@ -178,8 +174,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
-	// Anything left over, while the content pane has focus, goes to the
-	// viewport for its own scrolling.
+	// Anything left over goes to the viewport for its own scrolling.
 	if m.focus == focusContent {
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
@@ -189,8 +184,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// HeaderContent returns the repository's name plus the branch and change
-// counts, for the app title bar.
+// HeaderContent returns the repo name, branch and change counts.
 func (m Model) HeaderContent() (title string, segments []string) {
 	name := m.repoName
 	if name == "" {
@@ -200,8 +194,7 @@ func (m Model) HeaderContent() (title string, segments []string) {
 	return name, []string{styles.Muted.Render(m.branch), styles.Subtle.Render(m.base.label()), m.changeCounts()}
 }
 
-// changeCounts summarizes the working tree as "+3 ~12 -1", leaving out any
-// kind that isn't present.
+// changeCounts is "+3 ~12 -1", leaving out any kind that isn't present.
 func (m Model) changeCounts() string {
 	counts := map[git.ChangeType]int{}
 	for _, f := range m.files {
@@ -243,8 +236,7 @@ func (m Model) footer() string {
 	return components.Footer(m.width, m.help, m.activeKeys())
 }
 
-// footerHeight measures the footer by rendering it, so the layout can't
-// drift from the real help bar the way a hardcoded constant would.
+// footerHeight measures the footer, since the help bar's height changes.
 func (m Model) footerHeight() int {
 	return lipgloss.Height(m.footer())
 }

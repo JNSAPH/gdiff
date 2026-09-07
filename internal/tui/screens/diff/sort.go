@@ -17,8 +17,7 @@ const (
 	sortByPath
 )
 
-// sortOption is one state the sort key cycles through. Adding a sort state
-// is just adding an entry here.
+// sortOption is one state the sort key cycles through; add one here.
 type sortOption struct {
 	mode      sortMode
 	ascending bool
@@ -32,8 +31,7 @@ var sortOptions = []sortOption{
 	{sortByPath, true, "Path "},
 }
 
-// cycleSort steps to the next sort state, or the previous one if reverse,
-// wrapping at either end.
+// cycleSort steps to the next sort state, or the previous one, wrapping.
 func (m Model) cycleSort(reverse bool) Model {
 	step := 1
 	if reverse {
@@ -46,8 +44,8 @@ func (m Model) cycleSort(reverse bool) Model {
 	return m.refreshList()
 }
 
-// applySort reorders m.allFiles in place; applyFilter derives the display
-// list from it. The cursor indexes into that order, so the selection moves.
+// applySort reorders m.allFiles in place; applyFilter derives the display list.
+// The cursor indexes that order, so the selection moves rather than follows.
 func (m Model) applySort() Model {
 	opt := sortOptions[m.sortIndex]
 
@@ -68,16 +66,14 @@ func (m Model) applySort() Model {
 	return m
 }
 
-// sortLabel puts the current sort state on the left and the cursor's
-// position in the list on the right, e.g. "Type ▲            3/32".
+// sortLabel is the sort state left, the cursor's position right.
 func (m Model) sortLabel(width int) string {
 	sort := styles.Subtle.Render("sort ") + styles.Muted.Render(sortOptions[m.sortIndex].label)
 
 	return spread(sort, m.listPosition(), width)
 }
 
-// baseName returns just the final segment of a change's path, for
-// name-based sorting.
+// baseName is a change's final path segment, for name sorting.
 func baseName(c git.FileChange) string {
 	return path.Base(c.Name())
 }

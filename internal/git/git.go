@@ -14,14 +14,12 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
-// Repo is an opened repository. Open it once and reuse it — every query
-// below goes through it, so nothing has to hit the filesystem again.
+// Repo is an opened repository. Open it once and reuse it.
 type Repo struct {
 	repo *gogit.Repository
 }
 
-// Open opens the repository containing path, searching parent directories
-// for the .git directory if necessary.
+// Open opens the repository containing path, searching parents for .git.
 func Open(path string) (*Repo, error) {
 	repo, err := gogit.PlainOpenWithOptions(path, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
@@ -40,8 +38,7 @@ const (
 	ChangeTypeRenamed
 )
 
-// Symbol returns a one-character glyph for compact display, e.g. a file
-// list or a count like "+3 ~12".
+// Symbol returns a one-character glyph for compact display.
 func (t ChangeType) Symbol() string {
 	switch t {
 	case ChangeTypeNew:
@@ -55,16 +52,14 @@ func (t ChangeType) Symbol() string {
 	}
 }
 
-// FileChange is one changed file. From is nil for a new file, To is nil for
-// a deleted one, and they differ for a rename.
+// FileChange is one changed file: From nil when new, To nil when deleted.
 type FileChange struct {
 	From *string
 	To   *string
 	Type ChangeType
 }
 
-// Name returns the path to display: where the file is now, or where it was
-// for a deletion.
+// Name returns the path to display: where the file is, or was if deleted.
 func (c FileChange) Name() string {
 	switch {
 	case c.To != nil:
@@ -76,8 +71,7 @@ func (c FileChange) Name() string {
 	}
 }
 
-// root returns the repository's working tree root — the directory every
-// shelled-out git command below needs to run in.
+// root returns the working tree root, where every git command below runs.
 func (r *Repo) root() (string, error) {
 	worktree, err := r.repo.Worktree()
 	if err != nil {
@@ -86,8 +80,12 @@ func (r *Repo) root() (string, error) {
 	return worktree.Filesystem.Root(), nil
 }
 
-// Name returns the repository's name, i.e. the directory its working tree
-// sits in.
+// Root is the working tree's root, as `git worktree list` spells it.
+func (r *Repo) Root() (string, error) {
+	return r.root()
+}
+
+// Name returns the repository's directory name.
 func (r *Repo) Name() string {
 	root, err := r.root()
 	if err != nil {
@@ -96,9 +94,8 @@ func (r *Repo) Name() string {
 	return filepath.Base(root)
 }
 
-// Branch returns the checked-out branch's short name, or a short commit
-// hash when HEAD is detached. Shells out for the same reason headContents
-// does: go-git's Head() can't resolve a linked worktree's HEAD.
+// Branch returns the checked-out branch, or a short hash when detached.
+// Shells out: go-git's Head() can't resolve a linked worktree's HEAD.
 func (r *Repo) Branch() string {
 	root, err := r.root()
 	if err != nil {
@@ -118,10 +115,8 @@ func (r *Repo) Branch() string {
 	return strings.TrimSpace(string(out))
 }
 
-// ChangedFiles lists the working tree's changes, sorted by path. Goes
-// through ChangedFilesAt rather than go-git's own Worktree().Status() —
-// go-git misreads a linked worktree's index, so this needs to work the same
-// whether r is the primary worktree or a linked one.
+// ChangedFiles lists the working tree's changes, sorted by path. Goes through
+// ChangedFilesAt because go-git misreads a linked worktree's index.
 func (r *Repo) ChangedFiles() ([]FileChange, error) {
 	root, err := r.root()
 	if err != nil {
@@ -139,8 +134,7 @@ const (
 	LineDeleted
 )
 
-// DiffLine is one line of a diff, pre-classified so callers can style it.
-// Old and New are its 1-based number per side, 0 where it doesn't appear.
+// DiffLine is one diff line; Old and New are its 1-based number per side.
 type DiffLine struct {
 	Type LineType
 	Text string
@@ -148,14 +142,12 @@ type DiffLine struct {
 	New  int
 }
 
-// FileDiff diffs filePath (relative to the repo root) at HEAD against its
-// current content. A side it's missing from counts as empty.
+// FileDiff diffs filePath at HEAD against its current content.
 func (r *Repo) FileDiff(filePath string) ([]DiffLine, error) {
 	return r.FileDiffAgainst("HEAD", filePath)
 }
 
-// FileDiffAgainst is FileDiff against an arbitrary ref instead of HEAD — the
-// checkpoint ref, in particular.
+// FileDiffAgainst is FileDiff against any ref, e.g. the checkpoint.
 func (r *Repo) FileDiffAgainst(ref, filePath string) ([]DiffLine, error) {
 	root, err := r.root()
 	if err != nil {
@@ -175,12 +167,9 @@ func (r *Repo) FileDiffAgainst(ref, filePath string) ([]DiffLine, error) {
 	return lineDiff(oldContent, newContent), nil
 }
 
-// contentAt returns filePath's content at ref, or "" if it wasn't there
-// (including when ref doesn't resolve at all — a repo with no commits yet).
-// Shells out rather than resolving the ref through go-git: a linked
-// worktree's branch ref lives in the main repo's refs, reached only via the
-// "commondir" indirection go-git doesn't follow, so it errors "reference not
-// found" for one.
+// contentAt returns filePath's content at ref, or "" if it wasn't there.
+// Shells out rather than resolving through go-git: a linked worktree's refs
+// live in the main repo, behind a "commondir" indirection go-git skips.
 func contentAt(root, ref, filePath string) (string, error) {
 	out, err := exec.Command("git", "-C", root, "show", ref+":"+filePath).Output()
 	if err != nil {
@@ -218,15 +207,13 @@ func (r *Repo) worktreeContents(filePath string) (string, error) {
 	return string(content), nil
 }
 
-// lineDiff computes a line-level diff, classifying each line as added,
-// deleted, or unchanged.
+// lineDiff classifies each line as added, deleted or unchanged.
 func lineDiff(oldContent, newContent string) []DiffLine {
 	dmp := diffmatchpatch.New()
 	a, b, lines := dmp.DiffLinesToChars(oldContent, newContent)
 	diffs := dmp.DiffCharsToLines(dmp.DiffMain(a, b, false), lines)
 
-	// Number each side independently: an added line only advances the new
-	// side's counter, a deleted line only the old side's.
+	// Number each side independently: an add advances only the new side.
 	var out []DiffLine
 	oldNum, newNum := 0, 0
 

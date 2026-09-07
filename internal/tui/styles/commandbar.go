@@ -5,12 +5,10 @@ import "charm.land/lipgloss/v2"
 // CommandBarWidth is the popup's total width, border included.
 const CommandBarWidth = 55
 
-// CommandBarInnerWidth is what's left for the input: the total less the two
-// border columns and the padding on each side.
+// CommandBarInnerWidth is the total less the border columns and padding.
 const CommandBarInnerWidth = CommandBarWidth - 4
 
-// CommandBar is the command popup's box. Like AppBorder it leaves its top
-// edge to be drawn by hand, so the "Commands" label can sit in it.
+// CommandBar leaves its top edge undrawn, so a label can sit in it.
 var CommandBar = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
 	BorderTop(false).

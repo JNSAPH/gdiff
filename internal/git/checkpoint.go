@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,21 +9,36 @@ import (
 	"strings"
 )
 
-// CheckpointRef is the ref gdiff advances each time a checkpoint is
-// accepted. It's never reachable from any branch, so an accepted checkpoint
-// never shows up in `git log` on a branch and a plain `git push` never sends
-// it anywhere — that's the whole point.
-const CheckpointRef = "refs/gdiff/checkpoint"
+// checkpointRefPrefix namespaces the refs gdiff advances on accept. Nothing
+// under it is reachable from a branch, so git log and git push never see it.
+const checkpointRefPrefix = "refs/gdiff/checkpoint/"
 
-// Checkpoint returns the commit hash the checkpoint ref currently points at,
-// and whether one has been set for this repo yet.
+// legacyCheckpointRef held the one shared checkpoint before per-branch refs.
+const legacyCheckpointRef = "refs/gdiff/checkpoint"
+
+// CheckpointRef is the current branch's checkpoint ref. One per branch: a
+// shared one makes the branch you left the baseline for the one you're on.
+func (r *Repo) CheckpointRef() (string, error) {
+	branch := r.Branch()
+	if branch == "" {
+		return "", errors.New("resolving the current branch")
+	}
+	return checkpointRefPrefix + branch, nil
+}
+
+// Checkpoint returns the commit the checkpoint ref points at, if it's set.
 func (r *Repo) Checkpoint() (hash string, ok bool, err error) {
 	root, err := r.root()
 	if err != nil {
 		return "", false, err
 	}
 
-	out, err := exec.Command("git", "-C", root, "rev-parse", "--verify", "-q", CheckpointRef).Output()
+	ref, err := r.CheckpointRef()
+	if err != nil {
+		return "", false, err
+	}
+
+	out, err := exec.Command("git", "-C", root, "rev-parse", "--verify", "-q", ref).Output()
 	if err != nil {
 		return "", false, nil // not set yet — not an error
 	}
@@ -30,14 +46,10 @@ func (r *Repo) Checkpoint() (hash string, ok bool, err error) {
 	return strings.TrimSpace(string(out)), true, nil
 }
 
-// EnsureCheckpoint keeps the checkpoint ref in sync with HEAD: creating it
-// pointed at HEAD the first time gdiff sees this repo, and fast-forwarding
-// it whenever a real commit has moved HEAD somewhere the checkpoint chain
-// doesn't already account for. Checkpoint-only usage (accept/reject) keeps
-// HEAD an ancestor of the checkpoint the whole time — HEAD never moves — so
-// this only ever does something because of an actual `git commit` made
-// outside gdiff. That's the point: committing for real counts as accepting,
-// the same as pressing y would. Safe to call any time.
+// EnsureCheckpoint keeps the checkpoint ref in sync with HEAD: created at
+// HEAD the first time, fast-forwarded when a real commit moved HEAD. Only a
+// commit made outside gdiff trips it — accept/reject never move HEAD — so
+// committing for real counts as accepting. Safe to call any time.
 func (r *Repo) EnsureCheckpoint() error {
 	root, err := r.root()
 	if err != nil {
@@ -60,14 +72,21 @@ func (r *Repo) EnsureCheckpoint() error {
 		return nil
 	}
 
-	return exec.Command("git", "-C", root, "update-ref", CheckpointRef, head).Run()
+	ref, err := r.CheckpointRef()
+	if err != nil {
+		return err
+	}
+
+	// A ref at legacyCheckpointRef blocks every ref beneath it. Dropping it
+	// costs that repo one baseline, re-made at HEAD on the next line.
+	_ = exec.Command("git", "-C", root, "update-ref", "-d", legacyCheckpointRef).Run()
+
+	return exec.Command("git", "-C", root, "update-ref", ref, head).Run()
 }
 
-// AcceptCheckpoint snapshots the current working tree — including
-// untracked files, respecting .gitignore — into a new commit parented on
-// the current checkpoint, and moves the checkpoint ref to it. Doesn't touch
-// HEAD or the current branch: the new commit is only ever reachable through
-// CheckpointRef.
+// AcceptCheckpoint snapshots the working tree — untracked files included,
+// .gitignore respected — into a commit parented on the current checkpoint.
+// HEAD and the branch don't move: only the ref reaches the new commit.
 func (r *Repo) AcceptCheckpoint() error {
 	if err := r.EnsureCheckpoint(); err != nil {
 		return err
@@ -89,8 +108,7 @@ func (r *Repo) AcceptCheckpoint() error {
 	defer os.Remove(tmpIndex)
 	env := append(os.Environ(), "GIT_INDEX_FILE="+tmpIndex)
 
-	// A fresh index plus `add -A` stages exactly what's on disk right now —
-	// a full snapshot, not a diff — so there's no need to seed it first.
+	// A fresh index plus `add -A` stages a full snapshot, not a diff.
 	add := exec.Command("git", "-C", root, "add", "-A")
 	add.Env = env
 	if out, err := add.CombinedOutput(); err != nil {
@@ -111,12 +129,16 @@ func (r *Repo) AcceptCheckpoint() error {
 	}
 	commit := strings.TrimSpace(string(commitOut))
 
-	return exec.Command("git", "-C", root, "update-ref", CheckpointRef, commit).Run()
+	ref, err := r.CheckpointRef()
+	if err != nil {
+		return err
+	}
+
+	return exec.Command("git", "-C", root, "update-ref", ref, commit).Run()
 }
 
-// AcceptCheckpointFile is AcceptCheckpoint narrowed to a single file: only
-// change's current content moves into the new checkpoint commit — every
-// other pending file keeps exactly the content the checkpoint already has.
+// AcceptCheckpointFile is AcceptCheckpoint for one file: every other pending
+// file keeps the content the checkpoint already has.
 func (r *Repo) AcceptCheckpointFile(change FileChange) error {
 	if err := r.EnsureCheckpoint(); err != nil {
 		return err
@@ -138,17 +160,15 @@ func (r *Repo) AcceptCheckpointFile(change FileChange) error {
 	defer os.Remove(tmpIndex)
 	env := append(os.Environ(), "GIT_INDEX_FILE="+tmpIndex)
 
-	// Seed from the checkpoint's own tree, not an empty index — every path
-	// besides this one needs to keep the content the checkpoint already
-	// recorded, not disappear.
+	// Seed from the checkpoint's tree, not an empty index — every other path
+	// has to keep its checkpointed content rather than disappear.
 	readTree := exec.Command("git", "-C", root, "read-tree", parent)
 	readTree.Env = env
 	if out, err := readTree.CombinedOutput(); err != nil {
 		return fmt.Errorf("seeding index from checkpoint: %w: %s", err, out)
 	}
 
-	// A rename or deletion means the old path shouldn't survive into the
-	// new checkpoint tree.
+	// A rename or deletion shouldn't leave the old path in the new tree.
 	if change.From != nil && (change.To == nil || *change.From != *change.To) {
 		rm := exec.Command("git", "-C", root, "rm", "--cached", "--ignore-unmatch", "--", *change.From)
 		rm.Env = env
@@ -180,13 +200,16 @@ func (r *Repo) AcceptCheckpointFile(change FileChange) error {
 	}
 	commit := strings.TrimSpace(string(commitOut))
 
-	return exec.Command("git", "-C", root, "update-ref", CheckpointRef, commit).Run()
+	ref, err := r.CheckpointRef()
+	if err != nil {
+		return err
+	}
+
+	return exec.Command("git", "-C", root, "update-ref", ref, commit).Run()
 }
 
-// RejectCheckpointFile restores change's path(s) to what the checkpoint has
-// — recreating a deleted-since-checkpoint file, reverting a modified one, or
-// removing one the checkpoint never had (a new file, or the new side of a
-// rename). Destructive, same as RejectCheckpoint, just narrower.
+// RejectCheckpointFile restores one path to what the checkpoint has, or drops
+// it if the checkpoint never had it. Destructive, like RejectCheckpoint.
 func (r *Repo) RejectCheckpointFile(change FileChange) error {
 	checkpoint, ok, err := r.Checkpoint()
 	if err != nil {
@@ -231,9 +254,8 @@ func (r *Repo) RejectCheckpointFile(change FileChange) error {
 		return nil
 	}
 
-	// `checkout <ref> -- <path>` stages what it restores; unstage so the
-	// result reads as ordinary uncommitted changes, matching
-	// RejectCheckpoint's whole-tree behavior.
+	// `checkout <ref> -- <path>` stages what it restores; unstage so the result
+	// reads as ordinary uncommitted changes.
 	args := append([]string{"-C", root, "reset", "--"}, toUnstage...)
 	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 		return fmt.Errorf("unstaging: %w: %s", err, out)
@@ -242,10 +264,8 @@ func (r *Repo) RejectCheckpointFile(change FileChange) error {
 	return nil
 }
 
-// RejectCheckpoint resets the working tree back to the checkpoint,
-// discarding everything since. Destructive: anything not committed
-// somewhere else is gone once this runs — that's exactly what an accepted
-// checkpoint is, a snapshot that was never committed anywhere real.
+// RejectCheckpoint resets the working tree to the checkpoint. Destructive: an
+// accepted checkpoint was never committed anywhere real, so this is final.
 func (r *Repo) RejectCheckpoint() error {
 	checkpoint, ok, err := r.Checkpoint()
 	if err != nil {
@@ -260,10 +280,8 @@ func (r *Repo) RejectCheckpoint() error {
 		return err
 	}
 
-	// Resets the index and working tree to the checkpoint's tree without
-	// moving HEAD or the branch. `git reset --hard` would move the branch
-	// pointer too, which is exactly the leak into real history this
-	// mechanism exists to avoid.
+	// Resets index and tree without moving HEAD or the branch — `reset --hard`
+	// would move the branch pointer, the leak into real history this avoids.
 	readTree := exec.Command("git", "-C", root, "read-tree", "--reset", "-u", checkpoint)
 	if out, err := readTree.CombinedOutput(); err != nil {
 		return fmt.Errorf("restoring checkpoint: %w: %s", err, out)
@@ -273,9 +291,8 @@ func (r *Repo) RejectCheckpoint() error {
 		return fmt.Errorf("removing files added since checkpoint: %w: %s", err, out)
 	}
 
-	// read-tree --reset leaves everything staged relative to HEAD; unstage
-	// it so the result reads as ordinary uncommitted changes, not a
-	// pre-staged commit waiting to happen.
+	// read-tree --reset leaves everything staged; unstage so the result reads
+	// as ordinary uncommitted changes.
 	if out, err := exec.Command("git", "-C", root, "reset").CombinedOutput(); err != nil {
 		return fmt.Errorf("unstaging: %w: %s", err, out)
 	}
@@ -283,10 +300,8 @@ func (r *Repo) RejectCheckpoint() error {
 	return nil
 }
 
-// tempIndexPath returns a path for a scratch git index that doesn't exist
-// yet. Git creates it fresh the first time it's used with GIT_INDEX_FILE,
-// but errors on an existing zero-length file, so this can't just use
-// os.CreateTemp's file directly.
+// tempIndexPath returns a path for a scratch index that doesn't exist yet:
+// git errors on an existing zero-length file, so os.CreateTemp won't do.
 func tempIndexPath() (string, error) {
 	f, err := os.CreateTemp("", "gdiff-index-*")
 	if err != nil {

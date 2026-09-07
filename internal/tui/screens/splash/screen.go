@@ -1,5 +1,4 @@
-// Package splash is the startup screen shown until its timer elapses or
-// the user presses a key.
+// Package splash is the startup screen, shown until its timer or a key ends it.
 package splash
 
 import (
@@ -9,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/JNSAPH/gdiff/internal/core"
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
@@ -17,15 +17,13 @@ const (
 	tickInterval = 50 * time.Millisecond  // how often the progress bar redraws
 )
 
-// DoneMsg signals that the splash screen is finished, either because its
-// timer elapsed or the user skipped it. The router switches screens on it.
+// DoneMsg tells the router the splash is finished, by timer or by key.
 type DoneMsg struct{}
 
 // tickMsg advances the progress bar by tickInterval.
 type tickMsg struct{}
 
-// Init returns the commands the screen needs while it's active: the
-// auto-advance timer and the progress bar's tick.
+// Init starts the auto-advance timer and the progress bar's tick.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.Tick(duration, func(time.Time) tea.Msg { return DoneMsg{} }),
@@ -65,7 +63,12 @@ func (m Model) HeaderContent() (title string, segments []string) {
 func (m Model) View() string {
 	block := lipgloss.JoinVertical(
 		lipgloss.Center,
-		styles.BrandTitle.Render("gdiff"),
+		lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			styles.BrandTitle.Render("gdiff"),
+			" ",
+			styles.Subtle.Render("v"+core.Version),
+		),
 		styles.Muted.Render("by aph"),
 		"",
 		styles.Subtle.Render("press any key to continue"),

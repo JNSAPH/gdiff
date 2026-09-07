@@ -12,7 +12,7 @@
   - `internal/tui/components/` — stateless render helpers shared across screens
   - `internal/tui/styles/` — palette and shared styles; the only place hex colors live
   - `internal/tui/commandbar/` — the `:` command popup
-  - `internal/tui/screens/` — one package per screen: `splash`, `diff`, `worktrees`
+  - `internal/tui/screens/` — one package per screen: `splash`, `diff`, `worktrees`, `branches`
 - **Shared helpers:** `internal/tui/components/` for anything that renders and has no state. Look there before writing a render helper; put new ones there once a second screen needs them. Git access goes through `internal/git`, never `os/exec` at a call site.
 - **Shared constants:** `internal/tui/styles/` for colors and chrome dimensions. Per-screen constants read by more than one file of that screen go in that screen's `consts.go` (see `screens/diff/consts.go`); ones only their own file uses stay next to the code that reads them.
 - **Commands:** `make check` (`go build ./...`, `go vet ./...`, `gofmt -l .`) · `make run` · `make dev` (debug logging) · `make build` → `bin/gdiff`. There is no test suite yet.
@@ -34,7 +34,8 @@ internal/core/         logger setup (log/slog -> gdiff.log, dev only)
 internal/git/
   git.go               Repo, ChangeType, FileChange, DiffLine, lineDiff
   worktree.go          worktree listing + porcelain status parsing
-  checkpoint.go        the checkpoint ref: accept/reject, whole-file and per-file
+  branch.go            branch listing (local + remote, merged by name) and checkout
+  checkpoint.go        the checkpoint refs, one per branch: accept/reject, whole-file and per-file
 internal/tui/
   app.go               root Init/Update/View — the router
   model.go             root Model + its state transitions
@@ -48,12 +49,14 @@ internal/tui/
     header.go          the app title bar
     footer.go          help model + footer row
     rule.go            label-in-a-border/divider arithmetic
+    path.go            StyledPath: a path with everything but its last segment dimmed
     sidebar.go         the left panel's chrome
     changetype.go      ChangeTypeColor + ChangeCounts, shared by every screen
   commandbar/          the ":" command popup
     commands.go        the commands the bar accepts
   screens/splash/      startup screen
   screens/worktrees/   worktree list, each with its own change summary
+  screens/branches/    branch list; enter checks one out and reopens the diff view
   screens/diff/        main screen (package diffview): file sidebar + diff pane
     screen.go          Model, Init/Update/View, header, footer
     model.go           state transitions; loadDiff reads git
@@ -103,7 +106,7 @@ func (m Model) View() string
 
 There's deliberately no `Screen` interface — each `Update` returns a different
 concrete type, so an interface would need `tea.Model` and cost a type assertion per
-message for no gain at three screens. Add one only if the screen count makes the
+message for no gain at four screens. Add one only if the screen count makes the
 router's switch statements unwieldy.
 
 **`Update` is a thin dispatcher.** Every case calls a method on `Model`; no state
@@ -372,6 +375,11 @@ There is no test suite yet. When adding one:
 - **Checkpoint operations write to the working tree.** `RejectCheckpoint*` overwrites
   and deletes real files. Treat anything in `git/checkpoint.go` as destructive and
   read the whole function before changing it.
+- **One checkpoint ref per branch**, at `refs/gdiff/checkpoint/<branch>`. A single
+  shared ref reads the branch you just left as the baseline for the one you switched
+  to — `EnsureCheckpoint`'s ancestor test sees a branch switch as already caught up —
+  and reject then restores the other branch's content over your files. Don't collapse
+  them back into one.
 
 ## Known gaps
 

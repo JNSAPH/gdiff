@@ -5,12 +5,11 @@ import (
 	"os"
 )
 
-// LogFilePath is where gdiff writes its logs in dev mode. The TUI owns the
-// terminal (alt screen), so logs can't go to stderr while it runs.
+// LogFilePath is where dev-mode logs go: the TUI owns the terminal, not stderr.
 const LogFilePath = "gdiff.log"
 
-// SetupLogger writes slog to LogFilePath in dev mode and discards it
-// otherwise — a normal run must not litter the repo it was pointed at.
+// SetupLogger logs to LogFilePath in dev mode and discards otherwise — a normal
+// run must not litter the repo it was pointed at.
 func SetupLogger(dev bool) {
 	if !dev {
 		slog.SetDefault(slog.New(slog.DiscardHandler))

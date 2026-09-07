@@ -15,13 +15,11 @@ func (m Model) resize(width, height int) Model {
 	m.viewport.SetHeight(max(0, m.bodyHeight()-contentHeaderHeight-m.tabsHeight()))
 	m.filter.SetWidth(m.filterWidth())
 
-	// The diff's rows are padded to the pane's width, so a resize has to
-	// re-render them — but not re-read them.
+	// A resize re-renders the padded rows — but doesn't re-read them.
 	return m.clampListOffset().renderDiff()
 }
 
-// bodyHeight is the height left for the sidebar and content pane once the
-// footer has taken its rows.
+// bodyHeight is what's left for the panes once the footer has taken its rows.
 func (m Model) bodyHeight() int {
 	return max(0, m.height-m.footerHeight())
 }
@@ -39,8 +37,7 @@ func (m Model) listRows() int {
 	return max(0, m.bodyHeight()-sidebarHeaderHeight)
 }
 
-// selectPrev and selectNext step through the file list — up and down the
-// sidebar, or left and right along the tab strip.
+// selectPrev and selectNext step through the list, up/down or left/right.
 func (m Model) selectPrev() Model {
 	if m.cursor > 0 {
 		m.cursor--
@@ -65,8 +62,7 @@ func (m Model) refreshList() Model {
 	return m.clampListOffset().loadDiff()
 }
 
-// clampListOffset scrolls the file list just far enough to keep the cursor
-// on screen, and never past the end of the list.
+// clampListOffset scrolls the list only as far as the cursor needs.
 func (m Model) clampListOffset() Model {
 	rows := m.listRows()
 	if rows <= 0 {
@@ -86,8 +82,7 @@ func (m Model) clampListOffset() Model {
 	return m
 }
 
-// AdvanceScroll steps the selected row's marquee on by one column. The
-// router calls it on its own clock; scrollWindow wraps the offset.
+// AdvanceScroll steps the marquee a column. The router calls it on its clock.
 func (m Model) AdvanceScroll() Model {
 	m.scrollOffset++
 	return m
@@ -101,8 +96,7 @@ func (m Model) selected() (git.FileChange, bool) {
 	return m.files[m.cursor], true
 }
 
-// loadDiff reads the selected file's diff and hands it to the viewport.
-// This is the step that touches git; renderDiff only re-draws what it read.
+// loadDiff reads the selected file's diff; renderDiff only re-draws it.
 func (m Model) loadDiff() Model {
 	if m.loadErr != nil {
 		return m.showMessage(styles.Error.Render("error: " + m.loadErr.Error()))
@@ -119,7 +113,10 @@ func (m Model) loadDiff() Model {
 	var lines []git.DiffLine
 	var err error
 	if m.base == baseCheckpoint {
-		lines, err = m.repo.FileDiffAgainst(git.CheckpointRef, file.Name())
+		var ref string
+		if ref, err = m.repo.CheckpointRef(); err == nil {
+			lines, err = m.repo.FileDiffAgainst(ref, file.Name())
+		}
 	} else {
 		lines, err = m.repo.FileDiff(file.Name())
 	}
@@ -135,12 +132,10 @@ func (m Model) loadDiff() Model {
 	return m.renderDiff()
 }
 
-// leadingContext is how many unchanged lines to keep above the first change,
-// so it doesn't open flush against the top edge.
+// leadingContext keeps a few unchanged lines above the first change.
 const leadingContext = 3
 
-// firstChange is the line to open a diff at: far enough down to show the
-// first actual change, since a file's changes are rarely at the top.
+// firstChange opens the diff at the first real change, rarely the top.
 func firstChange(lines []git.DiffLine) int {
 	for i, l := range lines {
 		if l.Type != git.LineEqual {
@@ -150,8 +145,8 @@ func firstChange(lines []git.DiffLine) int {
 	return 0
 }
 
-// showMessage puts a centered line in the diff pane instead of a diff. It's
-// kept on the model so a resize can re-center it.
+// showMessage replaces the diff with a centered line, kept so a resize
+// can re-center it.
 func (m Model) showMessage(text string) Model {
 	m.diffLines = nil
 	m.message = text
@@ -170,9 +165,8 @@ func (m Model) toggleFocus() Model {
 	return m.setFocus(focusSidebar)
 }
 
-// toggleLayout pins the file list to whichever layout isn't showing. Seeding
-// from narrow() means the first press always gives the opposite of what's on
-// screen, toggled before or not.
+// toggleLayout pins the layout that isn't showing. Seeding from narrow() means
+// the first press always gives the opposite of what's on screen.
 func (m Model) toggleLayout() Model {
 	if m.narrow() {
 		m.layout = layoutSidebar
@@ -182,8 +176,7 @@ func (m Model) toggleLayout() Model {
 	return m.resize(m.width, m.height)
 }
 
-// toggleHelp expands or collapses the help bar. That changes the footer's
-// height, so the layout has to be re-derived.
+// toggleHelp resizes the help bar, so the layout is re-derived.
 func (m Model) toggleHelp() Model {
 	m.help.ShowAll = !m.help.ShowAll
 	return m.resize(m.width, m.height)
@@ -199,16 +192,17 @@ func (m Model) refreshGit() Model {
 		m.repo = repo
 	}
 
-	// Best-effort, every refresh: catches a real `git commit` made outside
-	// gdiff since we last checked, fast-forwarding the checkpoint to match.
-	// HEAD mode works fine even if this fails; only checkpoint mode needs
-	// it, and that surfaces its own error at that point.
+	// Best-effort: catches a real commit made outside gdiff since the last
+	// check. Only checkpoint mode needs it, and that surfaces its own error.
 	_ = m.repo.EnsureCheckpoint()
 
 	var files []git.FileChange
 	var err error
 	if m.base == baseCheckpoint {
-		files, err = git.ChangedFilesAgainst(m.gitPath, git.CheckpointRef)
+		var ref string
+		if ref, err = m.repo.CheckpointRef(); err == nil {
+			files, err = git.ChangedFilesAgainst(m.gitPath, ref)
+		}
 	} else {
 		files, err = m.repo.ChangedFiles()
 	}

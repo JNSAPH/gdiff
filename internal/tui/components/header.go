@@ -8,15 +8,14 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// HeaderHeight is how many rows Header renders — always one, by
-// construction (it never contains a newline).
+// HeaderHeight is one row, by construction — Header never contains a newline.
 const HeaderHeight = 1
 
 // headerSeparator divides the title bar's segments.
 const headerSeparator = " · "
 
-// Header renders the title bar: title plus any non-empty segments, centered
-// in the body's top border row. Segments arrive already styled by the caller.
+// Header renders title plus any non-empty segments, already styled by the
+// caller, centered in the body's top border row.
 func Header(width int, title string, segments ...string) string {
 	parts := make([]string, 0, len(segments)+1)
 	if title != "" {
