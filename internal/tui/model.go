@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/JNSAPH/gdiff/internal/tui/commandbar"
 	"github.com/JNSAPH/gdiff/internal/tui/components"
+	"github.com/JNSAPH/gdiff/internal/tui/screens/branches"
 	diffview "github.com/JNSAPH/gdiff/internal/tui/screens/diff"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/splash"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/worktrees"
@@ -18,10 +21,10 @@ const (
 	screenSplash screen = iota
 	screenDiffView
 	screenWorktrees
+	screenBranches
 )
 
-// Model is the app's root state. It holds only what's global and routes
-// everything else to the active screen's own Model.
+// Model is the app's root state; everything else routes to a screen.
 type Model struct {
 	showCommandBar bool
 	width, height  int
@@ -32,14 +35,18 @@ type Model struct {
 	diffView   diffview.Model
 	splash     splash.Model
 	worktrees  worktrees.Model
+	branches   branches.Model
 	commandBar commandbar.Model
 }
 
+// NewModel builds every screen up front; they stay unsized until the first
+// tea.WindowSizeMsg reaches resize.
 func NewModel(gitPath string) Model {
 	return Model{
 		diffView:   diffview.New(gitPath),
 		splash:     splash.New(),
 		worktrees:  worktrees.New(gitPath),
+		branches:   branches.New(gitPath),
 		commandBar: commandbar.New(),
 	}
 }
@@ -62,34 +69,69 @@ func (m Model) closeCommandBar() (Model, tea.Cmd) {
 	return m, nil
 }
 
+// marqueeTickMsg steps the diff view's filename scroll.
+type marqueeTickMsg struct{}
+
+// marqueeTick schedules the next marquee step. The router owns the timer so
+// exactly one chain runs: a screen re-arming its own loses it when a message
+// is routed elsewhere, and starts a second on every re-entry.
+func marqueeTick() tea.Cmd {
+	return tea.Tick(diffview.ScrollTickInterval, func(time.Time) tea.Msg { return marqueeTickMsg{} })
+}
+
+// advanceMarquee steps the scroll and re-arms unconditionally, whatever screen
+// is showing, so the chain can't die.
+func (m Model) advanceMarquee() (Model, tea.Cmd) {
+	m.diffView = m.diffView.AdvanceScroll()
+	return m, marqueeTick()
+}
+
+// capturesInput reports whether the active screen is taking typed text.
+func (m Model) capturesInput() bool {
+	return m.active == screenDiffView && m.diffView.CapturesInput()
+}
+
 // showDiffView switches to the diff view and starts its commands.
 func (m Model) showDiffView() (Model, tea.Cmd) {
 	m.active = screenDiffView
 	return m, m.diffView.Init()
 }
 
-// showWorktrees switches to the worktrees screen and starts its commands.
+// showWorktrees switches to the worktrees screen. Already there is a no-op.
 func (m Model) showWorktrees() (Model, tea.Cmd) {
+	if m.active == screenWorktrees {
+		return m, nil
+	}
+
 	m.active = screenWorktrees
 	return m, m.worktrees.Init()
 }
 
-// openWorktree reopens the diff view on a different worktree's path and
-// switches to it. After this, ":diff" means this worktree until another one
-// is opened.
-func (m Model) openWorktree(path string) (Model, tea.Cmd) {
-	m.diffView = diffview.New(path)
+// showBranches switches to the branches screen. Already there is a no-op.
+func (m Model) showBranches() (Model, tea.Cmd) {
+	if m.active == screenBranches {
+		return m, nil
+	}
 
-	// The new diffView is unsized until it's handed the space every screen
-	// gets from the router, same as a real terminal resize would.
+	m.active = screenBranches
+	return m, m.branches.Init()
+}
+
+// openDiffAt reopens the diff view on path — its files may have all changed.
+func (m Model) openDiffAt(path string) (Model, tea.Cmd) {
+	m.diffView = diffview.New(path)
+	m.branches = branches.New(path)
+	m.worktrees = m.worktrees.SetActive(path)
+
+	// The new diffView is unsized until the router hands it space.
 	m, resizeCmd := m.resize(m.width, m.height)
 	m, showCmd := m.showDiffView()
 
 	return m, tea.Batch(resizeCmd, showCmd)
 }
 
-// resize stores the new terminal size and passes each screen the space it
-// actually gets: the terminal minus the app border and the header row.
+// resize stores the terminal size and passes each screen what it actually
+// gets: the terminal less the app border and header.
 func (m Model) resize(width, height int) (Model, tea.Cmd) {
 	m.width, m.height = width, height
 
@@ -98,11 +140,11 @@ func (m Model) resize(width, height int) (Model, tea.Cmd) {
 		Height: max(0, height-styles.AppBorderHeightOverhead-components.HeaderHeight),
 	}
 
-	// The command bar is a fixed-size popup the router positions itself, so
-	// it doesn't get a size.
+	// The command bar is a fixed-size popup the router places, so it gets none.
 	var cmd tea.Cmd
 	m.splash, _ = m.splash.Update(inner)
 	m.worktrees, _ = m.worktrees.Update(inner)
+	m.branches, _ = m.branches.Update(inner)
 	m.diffView, cmd = m.diffView.Update(inner)
 	return m, cmd
 }
@@ -115,6 +157,8 @@ func (m Model) updateActiveScreen(msg tea.Msg) (Model, tea.Cmd) {
 		m.splash, cmd = m.splash.Update(msg)
 	case screenWorktrees:
 		m.worktrees, cmd = m.worktrees.Update(msg)
+	case screenBranches:
+		m.branches, cmd = m.branches.Update(msg)
 	default:
 		m.diffView, cmd = m.diffView.Update(msg)
 	}
@@ -130,6 +174,8 @@ func (m Model) runCommand(value string) (Model, tea.Cmd) {
 		return m.quitApp()
 	case commandbar.CommandWorktrees:
 		return m.showWorktrees()
+	case commandbar.CommandBranches:
+		return m.showBranches()
 	case commandbar.CommandDiff:
 		return m.showDiffView()
 	case commandbar.CommandAccept:
@@ -145,9 +191,8 @@ func (m Model) runCommand(value string) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// acceptCheckpoint and rejectCheckpoint only apply to the diff you're
-// actually looking at — both are no-ops from any other screen, so there's no
-// way to accept or discard changes you haven't seen.
+// acceptCheckpoint and rejectCheckpoint only apply to the diff you're looking
+// at — no way to accept or discard changes you haven't seen.
 
 func (m Model) acceptCheckpoint(all bool) (Model, tea.Cmd) {
 	if m.active != screenDiffView {

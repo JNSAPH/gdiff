@@ -10,8 +10,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// sidebar renders the left panel: the header, then the visible window of the
-// file list with a scrollbar down its right edge.
+// sidebar renders the header, then the visible window of the file list.
 func (m Model) sidebar(height int) string {
 	width := m.sidebarW() - components.SidebarBorderWidth
 	rows := max(0, height-sidebarHeaderHeight)
@@ -24,8 +23,7 @@ func (m Model) sidebar(height int) string {
 	)
 }
 
-// fileRows renders the visible slice of the file list, one row per line,
-// with the scrollbar occupying the last column.
+// fileRows renders the visible slice of the list, padded to the panel's height.
 func (m Model) fileRows(width, rows int) string {
 	if rows <= 0 {
 		return ""
@@ -36,8 +34,7 @@ func (m Model) fileRows(width, rows int) string {
 
 	list := fileList(window, m.listOffset, m.cursor, m.scrollOffset, width-1)
 
-	// Pair each row with its scrollbar cell, padding out any rows the file
-	// list didn't fill so the scrollbar still spans the panel.
+	// Rows the list didn't fill stay blank, so a short list fills the panel.
 	lines := make([]string, rows)
 	listLines := strings.Split(list, "\n")
 
@@ -52,17 +49,36 @@ func (m Model) fileRows(width, rows int) string {
 	return strings.Join(lines, "\n")
 }
 
-// sidebarHeader renders the sort state, then the file count centered in a
-// divider.
+// sidebarHeader renders the sort state or filter, then the file count.
 func (m Model) sidebarHeader(width int) string {
 	count := " " + strconv.Itoa(len(m.files)) + " files "
 	if len(m.files) == 1 {
 		count = " 1 file "
 	}
 
+	// One row, two things that want it: the filter wins while it's in play.
+	first := m.sortLabel(width)
+	if m.filterActive() {
+		first = m.filterRow(width)
+	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.sortLabel(width),
+		first,
 		components.Rule(width, styles.Muted.Render(count), styles.BorderLine),
 	)
+}
+
+// listPosition is the cursor's place in the file list, e.g. "3/32".
+func (m Model) listPosition() string {
+	if len(m.files) == 0 {
+		return ""
+	}
+	return styles.Subtle.Render(strconv.Itoa(m.cursor+1) + "/" + strconv.Itoa(len(m.files)))
+}
+
+// spread pushes left and right to opposite ends of a row width columns wide.
+func spread(left, right string, width int) string {
+	gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
+	return left + strings.Repeat(" ", gap) + right
 }

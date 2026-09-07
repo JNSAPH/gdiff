@@ -7,42 +7,23 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// Model holds the command bar's state. Its size is fixed (see
-// styles.CommandBarWidth) and the router positions it, so it tracks neither.
+// Model holds the command bar's state. Fixed size, router-positioned, so it
+// tracks neither.
 type Model struct {
 	input textinput.Model
 }
 
+// New builds the bar closed, its input pre-loaded with the command names.
 func New() Model {
 	input := textinput.New()
 	input.Prompt = ": "
 	input.Placeholder = "type a command"
 	input.ShowSuggestions = true
 	input.SetSuggestions(Commands)
-	input.SetStyles(inputStyles())
+	input.SetStyles(styles.TextInput())
 	input.SetWidth(styles.CommandBarInnerWidth)
 
 	return Model{input: input}
-}
-
-// inputStyles paints the text input in the app's palette, dimming it while
-// it doesn't have focus.
-func inputStyles() textinput.Styles {
-	s := textinput.DefaultDarkStyles()
-
-	s.Focused.Prompt = styles.BrandTitle
-	s.Focused.Text = styles.Text
-	s.Focused.Placeholder = styles.Subtle
-	s.Focused.Suggestion = styles.Subtle
-
-	s.Blurred.Prompt = styles.Subtle
-	s.Blurred.Text = styles.Muted
-	s.Blurred.Placeholder = styles.Subtle
-	s.Blurred.Suggestion = styles.Subtle
-
-	s.Cursor.Color = styles.BrandColor
-
-	return s
 }
 
 func (m Model) close() (Model, tea.Cmd) {

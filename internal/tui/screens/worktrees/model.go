@@ -7,8 +7,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/components"
 )
 
-// entry pairs a worktree with a summary of its own uncommitted changes —
-// each worktree has an independent working tree and index.
+// entry pairs a worktree with its own changes — each has an independent index.
 type entry struct {
 	git.Worktree
 	counts  map[git.ChangeType]int
@@ -18,10 +17,13 @@ type entry struct {
 // headerHeight is how many rows sit above the list: the title rule.
 const headerHeight = 2
 
-// Model holds the worktrees screen's state: the listed worktrees and the
-// cursor into them.
+// Model holds the worktrees screen's state.
 type Model struct {
 	gitPath string
+
+	// active is the worktree the diff view is on, resolved to the root git
+	// lists it under — the path the router sets can be any directory inside it.
+	active string
 
 	entries    []entry
 	cursor     int
@@ -36,7 +38,22 @@ type Model struct {
 // New lists gitPath's worktrees and, for each, its own uncommitted changes.
 func New(gitPath string) Model {
 	m := Model{gitPath: gitPath, help: components.NewHelp()}
-	return m.refresh()
+	return m.SetActive(gitPath).refresh()
+}
+
+// SetActive points the marker at the worktree the diff view just opened.
+func (m Model) SetActive(path string) Model {
+	m.active = ""
+
+	repo, err := git.Open(path)
+	if err != nil {
+		return m
+	}
+	if root, err := repo.Root(); err == nil {
+		m.active = root
+	}
+
+	return m
 }
 
 // refresh re-lists the worktrees and their change summaries from scratch.
@@ -86,8 +103,7 @@ func (m Model) resize(width, height int) Model {
 	return m.clampListOffset()
 }
 
-// bodyHeight is the height left for the list once the footer has taken its
-// rows.
+// bodyHeight is what's left for the list once the footer has taken its rows.
 func (m Model) bodyHeight() int {
 	return max(0, m.height-m.footerHeight())
 }
@@ -96,8 +112,7 @@ func (m Model) listRows() int {
 	return max(0, m.bodyHeight()-headerHeight)
 }
 
-// toggleHelp expands or collapses the help bar. That changes the footer's
-// height, so the list has to be re-clamped.
+// toggleHelp resizes the help bar, so the list has to be re-clamped.
 func (m Model) toggleHelp() Model {
 	m.help.ShowAll = !m.help.ShowAll
 	return m.clampListOffset()
@@ -125,8 +140,7 @@ func (m Model) selected() (entry, bool) {
 	return m.entries[m.cursor], true
 }
 
-// clampListOffset scrolls the list just far enough to keep the cursor on
-// screen, and never past the end of the list. Same logic as diffview's.
+// clampListOffset scrolls the list only as far as the cursor needs.
 func (m Model) clampListOffset() Model {
 	rows := m.listRows()
 	if rows <= 0 {

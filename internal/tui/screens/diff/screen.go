@@ -1,5 +1,4 @@
-// Package diffview is the main screen: a sidebar listing changed files
-// next to a pane showing the selected file's diff.
+// Package diffview is the main screen: a file sidebar beside a diff pane.
 package diffview
 
 import (
@@ -7,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -16,11 +16,8 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// marquee speed
-const scrollTickInterval = 300 * time.Millisecond
-
-// tickMsg advances the selected file's marquee scroll.
-type tickMsg struct{}
+// ScrollTickInterval is the marquee's step. The router drives the timer.
+const ScrollTickInterval = 300 * time.Millisecond
 
 // focus identifies which pane has keyboard focus.
 type focus int
@@ -30,6 +27,7 @@ const (
 	focusContent
 )
 
+// Model is the diff screen's state: the repo, its files, and the current diff.
 type Model struct {
 	gitPath string
 	repo    *git.Repo
@@ -37,8 +35,9 @@ type Model struct {
 	repoName string
 	branch   string
 
-	files   []git.FileChange // in display order, see applySort
-	loadErr error
+	allFiles []git.FileChange // every changed file git reported
+	files    []git.FileChange // display order: sorted, then filtered
+	loadErr  error
 
 	cursor       int // index into files
 	listOffset   int // first file row the sidebar shows
@@ -48,8 +47,12 @@ type Model struct {
 	focus        focus
 	layout       layoutMode
 
-	// The selected file's diff, kept so the pane can be re-rendered on a
-	// resize without reading git again. When there's none, message says why.
+	// The "/" filter: filtering is focus, the query stays until "/" clears it.
+	filter    textinput.Model
+	filtering bool
+
+	// The current diff, kept so a resize re-renders without reading git. With
+	// none, message says why.
 	diffLines    []git.DiffLine
 	lineNumWidth int
 	message      string
@@ -59,10 +62,15 @@ type Model struct {
 	help          help.Model
 }
 
-// New opens the repository and loads its changed files. A failure goes to
-// loadErr and shows in the content pane, so the TUI can still start.
+// New opens the repository. A failure goes to loadErr and shows in the pane,
+// so the TUI can still start.
 func New(gitPath string) Model {
-	m := Model{gitPath: gitPath, help: components.NewHelp(), viewport: newViewport()}
+	m := Model{
+		gitPath:  gitPath,
+		help:     components.NewHelp(),
+		viewport: newViewport(),
+		filter:   newFilterInput(),
+	}
 
 	repo, err := git.Open(gitPath)
 	if err != nil {
@@ -70,13 +78,12 @@ func New(gitPath string) Model {
 		return m
 	}
 	m.repo = repo
-	m = m.refreshGit() // calls EnsureCheckpoint too
 
-	return m.applySort().loadDiff()
+	return m.refreshGit() // calls EnsureCheckpoint too
 }
 
-// newViewport builds the diff pane. Soft wrap is off so a long line scrolls
-// sideways instead of wrapping and breaking the row's background band.
+// newViewport turns soft wrap off, so a long line scrolls sideways instead of
+// wrapping and breaking the row's band.
 func newViewport() viewport.Model {
 	vp := viewport.New()
 	vp.SoftWrap = false
@@ -86,22 +93,15 @@ func newViewport() viewport.Model {
 	return vp
 }
 
-// Init returns the commands the screen needs while it's active.
+// Init has no commands: the marquee runs off the router's clock, not this one.
 func (m Model) Init() tea.Cmd {
-	return tick()
-}
-
-func tick() tea.Cmd {
-	return tea.Tick(scrollTickInterval, func(time.Time) tea.Msg { return tickMsg{} })
+	return nil
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.resize(msg.Width, msg.Height), nil
-
-	case tickMsg:
-		return m.advanceScroll(), tick()
 
 	case tea.MouseWheelMsg:
 		if m.focus == focusSidebar {
@@ -118,6 +118,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		k := m.activeKeys()
 
+		// The filter takes every key while focused, or "n" rejects a file.
+		if m.filtering {
+			switch {
+			case key.Matches(msg, k.FilterApply):
+				return m.lockFilter(), nil
+			case key.Matches(msg, k.FilterCancel):
+				return m.clearFilter(), nil
+			}
+			return m.updateFilter(msg)
+		}
+
 		// Keys that work in either pane
 		switch {
 		case key.Matches(msg, k.Help):
@@ -132,6 +143,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.cycleSort(true), nil
 		case key.Matches(msg, k.Refresh):
 			return m.refreshGit(), nil
+		case key.Matches(msg, k.Filter):
+			return m.toggleFilter()
 		case key.Matches(msg, k.ToggleBase):
 			return m.toggleBase(), nil
 		case key.Matches(msg, k.Accept):
@@ -161,8 +174,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
-	// Anything left over, while the content pane has focus, goes to the
-	// viewport for its own scrolling.
+	// Anything left over goes to the viewport for its own scrolling.
 	if m.focus == focusContent {
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
@@ -172,8 +184,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// HeaderContent returns the repository's name plus the branch and change
-// counts, for the app title bar.
+// HeaderContent returns the repo name, branch and change counts.
 func (m Model) HeaderContent() (title string, segments []string) {
 	name := m.repoName
 	if name == "" {
@@ -183,8 +194,7 @@ func (m Model) HeaderContent() (title string, segments []string) {
 	return name, []string{styles.Muted.Render(m.branch), styles.Subtle.Render(m.base.label()), m.changeCounts()}
 }
 
-// changeCounts summarizes the working tree as "+3 ~12 -1", leaving out any
-// kind that isn't present.
+// changeCounts is "+3 ~12 -1", leaving out any kind that isn't present.
 func (m Model) changeCounts() string {
 	counts := map[git.ChangeType]int{}
 	for _, f := range m.files {
@@ -226,8 +236,7 @@ func (m Model) footer() string {
 	return components.Footer(m.width, m.help, m.activeKeys())
 }
 
-// footerHeight measures the footer by rendering it, so the layout can't
-// drift from the real help bar the way a hardcoded constant would.
+// footerHeight measures the footer, since the help bar's height changes.
 func (m Model) footerHeight() int {
 	return lipgloss.Height(m.footer())
 }

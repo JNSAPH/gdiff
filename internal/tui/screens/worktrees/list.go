@@ -9,19 +9,17 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// list renders one row per entry in entries, which is the window of
-// m.entries starting at offset — cursor is still an index into the full list.
-func list(entries []entry, offset, cursor, width int) string {
+// list renders the window of entries at offset; cursor indexes the full list.
+func list(entries []entry, offset, cursor, width int, active string) string {
 	rows := make([]string, len(entries))
 	for i, e := range entries {
-		rows[i] = row(e, width, offset+i == cursor)
+		rows[i] = row(e, width, offset+i == cursor, e.Path == active)
 	}
 	return strings.Join(rows, "\n")
 }
 
-// row renders one worktree: accent bar, its directory name (path dimmed),
-// then its branch and change counts right-aligned.
-func row(e entry, width int, selected bool) string {
+// row renders one worktree: bar and directory, then branch and counts right.
+func row(e entry, width int, selected, active bool) string {
 	s := styles.Row
 	bar := " "
 	if selected {
@@ -29,8 +27,8 @@ func row(e entry, width int, selected bool) string {
 		bar = s.Accent.Render("▌")
 	}
 
-	left := bar + s.Row.Render(" ") + entryName(e, s)
-	right := entrySummary(e)
+	left := bar + s.Row.Render(" ") + components.StyledPath(e.Path, s)
+	right := activeMark(active, s) + entrySummary(e)
 
 	gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
 	row := left + s.Row.Render(strings.Repeat(" ", gap)) + right
@@ -42,18 +40,16 @@ func row(e entry, width int, selected bool) string {
 	return row
 }
 
-// entryName renders the worktree's path with its parent directory dimmed,
-// same treatment as a file's path in the diff view's file list.
-func entryName(e entry, s styles.RowStyles) string {
-	cut := strings.LastIndex(e.Path, "/")
-	if cut < 0 {
-		return s.Name.Render(e.Path)
+// activeMark flags the worktree the diff view is on, or holds its column so
+// the branches stay aligned.
+func activeMark(active bool, s styles.RowStyles) string {
+	if !active {
+		return s.Row.Render("  ")
 	}
-	return s.Dir.Render(e.Path[:cut+1]) + s.Name.Render(e.Path[cut+1:])
+	return s.Accent.Render("●") + s.Row.Render(" ")
 }
 
-// entrySummary renders the branch and, if the worktree has uncommitted
-// changes, the same "+N ~N -N" counts the diff view's header uses.
+// entrySummary is the branch plus, if dirty, the header's "+N ~N -N" counts.
 func entrySummary(e entry) string {
 	branch := styles.Muted.Render(e.Branch)
 

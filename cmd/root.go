@@ -12,9 +12,6 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui"
 )
 
-// version is replaced at build time by goreleaser's -ldflags.
-var version = "dev"
-
 var (
 	devFlag bool
 	gitPath string
@@ -23,7 +20,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:           "gdiff",
 	Short:         "Browse a git repository's changes in the terminal",
-	Version:       version,
+	Version:       core.Version,
 	Args:          cobra.ExactArgs(0),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -42,6 +39,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&gitPath, "path", "p", ".", "Path to the git repository")
 }
 
+// Execute runs the root command and exits non-zero on failure.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "gdiff:", err)

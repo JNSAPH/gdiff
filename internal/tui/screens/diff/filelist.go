@@ -10,8 +10,7 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// fileList renders one row per file in files, which is the window of
-// m.files starting at offset — cursor is still an index into the full list.
+// fileList renders the window of files at offset; cursor indexes the full list.
 func fileList(files []git.FileChange, offset, cursor, scrollOffset, width int) string {
 	rows := make([]string, len(files))
 	for i, c := range files {
@@ -21,8 +20,8 @@ func fileList(files []git.FileChange, offset, cursor, scrollOffset, width int) s
 	return strings.Join(rows, "\n")
 }
 
-// fileListItem renders one row: accent bar, change glyph, then the path with
-// its directory dimmed. An overlong selected row scrolls; others truncate.
+// fileListItem renders one row: bar, glyph, then the path with its directory
+// dimmed. An overlong selected row scrolls; others truncate.
 func fileListItem(file git.FileChange, width int, selected bool, scrollOffset int) string {
 	s := styles.Row
 	bar := " "
@@ -43,7 +42,7 @@ func fileListItem(file git.FileChange, width int, selected bool, scrollOffset in
 		name = truncateFront(name, available)
 	}
 
-	row := bar + s.Row.Render(" ") + glyph + s.Row.Render(" ") + styledPath(name, s)
+	row := bar + s.Row.Render(" ") + glyph + s.Row.Render(" ") + components.StyledPath(name, s)
 
 	// Pad to the full width so a selected row's band reaches the edge.
 	if pad := width - lipgloss.Width(row); pad > 0 {
@@ -53,19 +52,7 @@ func fileListItem(file git.FileChange, width int, selected bool, scrollOffset in
 	return row
 }
 
-// styledPath renders a path with its directory dimmed and its final segment
-// bright, so the eye lands on the file name.
-func styledPath(path string, s styles.RowStyles) string {
-	cut := strings.LastIndex(path, "/")
-	if cut < 0 {
-		return s.Name.Render(path)
-	}
-
-	return s.Dir.Render(path[:cut+1]) + s.Name.Render(path[cut+1:])
-}
-
-// scrollWindow returns the maxWidth-wide slice of name visible at
-// scrollOffset. A name that fits is returned as-is; a longer one loops.
+// scrollWindow is the maxWidth slice of name at scrollOffset; long names loop.
 func scrollWindow(name string, scrollOffset, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
@@ -88,8 +75,7 @@ func scrollWindow(name string, scrollOffset, maxWidth int) string {
 	return string(window)
 }
 
-// truncateFront shortens name to maxWidth by dropping characters from the
-// front, keeping the tail — usually the identifying part of a path.
+// truncateFront drops characters from the front, keeping a path's tail.
 func truncateFront(name string, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
@@ -109,9 +95,7 @@ func truncateFront(name string, maxWidth int) string {
 	return ellipsis + string(runes[len(runes)-keep:])
 }
 
-// truncateTail shortens name to maxWidth by dropping characters from the
-// end. The counterpart to truncateFront, for a bare file name — there the
-// front is the identifying part.
+// truncateTail drops them from the end, for a name whose front identifies it.
 func truncateTail(name string, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""

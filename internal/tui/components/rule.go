@@ -6,8 +6,8 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// TopBorderWithLabel renders a box's top border row with label embedded at
-// pos. The box's own style needs BorderTop(false) or it overdraws this.
+// TopBorderWithLabel draws a box's top border with label at pos. The box needs
+// BorderTop(false) or it overdraws this.
 func TopBorderWithLabel(width int, label string, pos lipgloss.Position, b lipgloss.Border, style lipgloss.Style) string {
 	left, right := fillAround(width-2, label, pos) // 2 for the corner runes
 
@@ -16,8 +16,7 @@ func TopBorderWithLabel(width int, label string, pos lipgloss.Position, b lipglo
 		style.Render(strings.Repeat(b.Top, right)+b.TopRight)
 }
 
-// Rule renders a plain horizontal divider spanning width, with label
-// centered in it, e.g. "──────── 6 files ────────".
+// Rule is a divider spanning width with label centered, "──── 6 files ────".
 func Rule(width int, label string, style lipgloss.Style) string {
 	left, right := fillAround(width, label, lipgloss.Center)
 
@@ -26,8 +25,7 @@ func Rule(width int, label string, style lipgloss.Style) string {
 		style.Render(strings.Repeat("─", right))
 }
 
-// fillAround splits the space left over after label into the runs of fill
-// that go before and after it, placing label at pos.
+// fillAround splits the leftover space into the runs before and after label.
 func fillAround(width int, label string, pos lipgloss.Position) (left, right int) {
 	fill := max(0, width-lipgloss.Width(label))
 	left = int(float64(fill) * float64(pos))

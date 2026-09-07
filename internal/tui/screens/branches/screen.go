@@ -1,6 +1,5 @@
-// Package worktrees lists the repository's worktrees with their own changes,
-// so one an agent left dirty stands out. Enter points the diff view at it.
-package worktrees
+// Package branches lists local and remote branches; enter checks one out.
+package branches
 
 import (
 	"strconv"
@@ -13,8 +12,8 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// SelectMsg tells the router to reopen the diff view on that worktree.
-type SelectMsg struct {
+// SwitchedMsg tells the router to reopen the diff view on the new branch.
+type SwitchedMsg struct {
 	Path string
 }
 
@@ -37,10 +36,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m.moveCursorUp(), nil
 		case key.Matches(msg, keys.Down):
 			return m.moveCursorDown(), nil
-		case key.Matches(msg, keys.Open):
-			if e, ok := m.selected(); ok {
-				return m, func() tea.Msg { return SelectMsg{Path: e.Path} }
-			}
+		case key.Matches(msg, keys.Switch):
+			return m.switchTo()
 		case key.Matches(msg, keys.Refresh):
 			return m.refresh(), nil
 		case key.Matches(msg, keys.Help):
@@ -52,11 +49,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) HeaderContent() (title string, segments []string) {
-	count := strconv.Itoa(len(m.entries)) + " worktrees"
-	if len(m.entries) == 1 {
-		count = "1 worktree"
+	count := strconv.Itoa(len(m.branches)) + " branches"
+	if len(m.branches) == 1 {
+		count = "1 branch"
 	}
-	return "Worktrees", []string{styles.Muted.Render(count)}
+	return "Branches", []string{styles.Muted.Render(count)}
 }
 
 func (m Model) View() string {
@@ -75,16 +72,30 @@ func (m Model) body() string {
 	}
 
 	rows := m.listRows()
-	end := min(m.listOffset+rows, len(m.entries))
-	window := m.entries[min(m.listOffset, len(m.entries)):end]
+	end := min(m.listOffset+rows, len(m.branches))
+	window := m.branches[min(m.listOffset, len(m.branches)):end]
 
 	return lipgloss.NewStyle().Width(m.width).Height(height).Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
-			"",
-			list(window, m.listOffset, m.cursor, m.width, m.active),
+			m.notice(),
+			list(window, m.listOffset, m.cursor, m.width),
 		),
 	)
+}
+
+// notice is the row above the list: the last refusal, or blank to hold it.
+// Rendered at the body's width, so a long one wraps here and not in the join.
+func (m Model) notice() string {
+	if m.switchErr == nil {
+		return ""
+	}
+	return lipgloss.NewStyle().Width(m.width).Render(" " + styles.Error.Render(m.switchErr.Error()))
+}
+
+// headerHeight measures the notice, since git's errors wrap onto a second row.
+func (m Model) headerHeight() int {
+	return lipgloss.Height(m.notice())
 }
 
 // footer renders the bottom help bar.

@@ -2,13 +2,13 @@ package splash
 
 import "time"
 
-// Model holds the splash screen's state: the terminal size, so the text can
-// be centered, and how much of the wait has elapsed, for the progress bar.
+// Model holds the splash screen's state: the size, and how much wait elapsed.
 type Model struct {
 	width, height int
 	elapsed       time.Duration
 }
 
+// New builds the splash screen; it sizes itself from the first WindowSizeMsg.
 func New() Model {
 	return Model{}
 }

@@ -12,12 +12,10 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// tabWidth is how many columns a tab in a diff expands to. Fixed so the
-// gutter stays aligned whatever the terminal does with tabs.
+// tabWidth is fixed so the gutter stays aligned whatever the terminal does.
 const tabWidth = 4
 
-// content renders the right-hand pane: the selected file's path, then the
-// diff viewport below it.
+// content renders the right-hand pane: the file's path, then the viewport.
 func (m Model) content() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -26,9 +24,8 @@ func (m Model) content() string {
 	)
 }
 
-// sidebarW is the sidebar's width. It keeps its preferred width until the
-// terminal gets narrow, then gives way so the diff pane stays usable — and
-// once the tabs take over, it takes no width at all.
+// sidebarW is the sidebar's width. It gives way as the terminal narrows so the
+// diff pane stays usable, and takes nothing at all once the tabs take over.
 func (m Model) sidebarW() int {
 	if m.narrow() {
 		return 0
@@ -41,8 +38,7 @@ func (m Model) contentWidth() int {
 	return max(0, m.width-m.sidebarW())
 }
 
-// contentHeader shows the selected file's path above the diff, with an
-// accent bar that lights up when the pane has focus.
+// contentHeader shows the file's path, its accent bar lit when focused.
 func (m Model) contentHeader(width int) string {
 	bar := styles.BorderLine.Render("▏")
 	if m.focus == focusContent {
@@ -55,8 +51,7 @@ func (m Model) contentHeader(width int) string {
 		return bar
 	}
 
-	// Path on the left, changed-line counts and scroll position on the right.
-	// The path gets whatever room the status leaves and truncates into it.
+	// Path left, counts and scroll right; the path truncates into what's left.
 	prefix := bar + " " + m.changeGlyph(file.Type) + " "
 
 	// On a narrow pane the file name matters more than the counts.
@@ -65,24 +60,21 @@ func (m Model) contentHeader(width int) string {
 		status = m.diffStats() + "  " + styles.Subtle.Render(m.scrollPercent())
 	}
 
-	// Two columns held back: one for the trailing space, one so the path
-	// never butts straight up against the status.
+	// Two columns held back: the trailing space, and one before the status.
 	room := max(0, width-lipgloss.Width(prefix)-lipgloss.Width(status)-2)
-	label := prefix + styledPath(truncateFront(file.Name(), room), styles.RowHeader)
+	label := prefix + components.StyledPath(truncateFront(file.Name(), room), styles.RowHeader)
 
 	gap := max(0, width-lipgloss.Width(label)-lipgloss.Width(status)-1)
 
 	return clamp(label+strings.Repeat(" ", gap)+status+" ", width)
 }
 
-// clamp truncates s to width columns, so a header can never overflow its
-// pane and wrap onto a second row.
+// clamp truncates s to width columns so a header can't wrap onto a second row.
 func clamp(s string, width int) string {
 	return lipgloss.NewStyle().MaxWidth(width).Render(s)
 }
 
-// scrollPercent reports how far down the diff the viewport is, right-aligned
-// so the counts beside it don't shift as it changes.
+// scrollPercent is right-aligned so the counts beside it don't shift.
 func (m Model) scrollPercent() string {
 	if len(m.diffLines) <= m.viewport.Height() {
 		return strings.Repeat(" ", statusWidth)
@@ -121,10 +113,9 @@ func (m Model) diffStats() string {
 }
 
 // renderDiff loads m.diffLines into the viewport, padding each to the pane's
-// width so its background band spans the row. Numbers and signs go in the gutter.
+// width so its background band spans the row.
 func (m Model) renderDiff() Model {
-	// No diff to show — center the message instead, and clear the gutter so
-	// it isn't indented under empty line numbers.
+	// No diff — center the message and clear the gutter so it isn't indented.
 	if len(m.diffLines) == 0 {
 		m.viewport.LeftGutterFunc = nil
 		m.viewport.StyleLineFunc = nil
@@ -145,8 +136,8 @@ func (m Model) renderDiff() Model {
 		longest = max(longest, lipgloss.Width(lines[i]))
 	}
 
-	// Pad to the longest line, not just the pane: scrolling sideways moves
-	// past the pane's width, and a band that stopped there would run out.
+	// Pad to the longest line, not the pane: scrolling sideways moves past the
+	// pane's width, and a band that stopped there would run out.
 	width := max(m.viewport.Width()-m.gutterWidth(), longest)
 	for i, text := range lines {
 		if pad := width - lipgloss.Width(text); pad > 0 {
@@ -174,8 +165,8 @@ func (m Model) diffLineStyle(i int) lipgloss.Style {
 	}
 }
 
-// diffGutter renders one row's line numbers and +/- sign. The viewport calls
-// it with a zero context to measure, so every return must be the same width.
+// diffGutter renders one row's numbers and sign. The viewport calls it with
+// a zero context to measure, so every return must be the same width.
 func (m Model) diffGutter(ctx viewport.GutterContext) string {
 	if len(m.diffLines) == 0 {
 		return ""
@@ -213,22 +204,20 @@ func (m Model) diffGutter(ctx viewport.GutterContext) string {
 	return nums(oldNo, newNo) + sign
 }
 
-// gutterWidth measures the gutter by rendering an empty one, so the content
-// width can't drift from the gutter's actual size.
+// gutterWidth renders an empty gutter, so it can't drift from the real one.
 func (m Model) gutterWidth() int {
 	return lipgloss.Width(m.diffGutter(viewport.GutterContext{}))
 }
 
 // pad right-aligns s in width columns.
 func pad(s string, width int) string {
-	if n := width - len(s); n > 0 {
+	if n := width - lipgloss.Width(s); n > 0 {
 		return strings.Repeat(" ", n) + s
 	}
 	return s
 }
 
-// numWidth is how many columns the line-number columns need to fit the
-// largest number in lines.
+// numWidth is the columns needed for the largest line number in lines.
 func numWidth(lines []git.DiffLine) int {
 	highest := 0
 	for _, l := range lines {

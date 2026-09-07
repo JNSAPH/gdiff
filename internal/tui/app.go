@@ -1,5 +1,4 @@
-// Package tui is the app's root model. It owns the global chrome — header,
-// border, command bar — and routes messages to the active screen.
+// Package tui is the root model: it owns the global chrome and routes messages.
 package tui
 
 import (
@@ -10,20 +9,21 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/commandbar"
 	"github.com/JNSAPH/gdiff/internal/tui/components"
 	"github.com/JNSAPH/gdiff/internal/tui/global"
+	"github.com/JNSAPH/gdiff/internal/tui/screens/branches"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/splash"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/worktrees"
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
 func (m Model) Init() tea.Cmd {
-	return m.splash.Init()
+	return tea.Batch(m.splash.Init(), marqueeTick())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Global keys, but only while the command bar has no focus.
-		if !m.showCommandBar {
+		// Global keys, unless something else owns the keyboard — "q" quits.
+		if !m.showCommandBar && !m.capturesInput() {
 			switch {
 			case key.Matches(msg, global.Quit):
 				return m.quitApp()
@@ -35,11 +35,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.resize(msg.Width, msg.Height)
 
+	case marqueeTickMsg:
+		return m.advanceMarquee()
+
 	case splash.DoneMsg:
 		return m.showDiffView()
 
 	case worktrees.SelectMsg:
-		return m.openWorktree(msg.Path)
+		return m.openDiffAt(msg.Path)
+
+	case branches.SwitchedMsg:
+		return m.openDiffAt(msg.Path)
 
 	case commandbar.CloseMsg:
 		return m.closeCommandBar()
@@ -48,11 +54,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.runCommand(msg.Value)
 	}
 
-	// While it's open, the command bar takes everything else.
+	// The bar owns the keyboard while it's open, but only the keyboard: routing
+	// everything to it would drop whatever else is in flight.
 	if m.showCommandBar {
-		var cmd tea.Cmd
-		m.commandBar, cmd = m.commandBar.Update(msg)
-		return m, cmd
+		var barCmd tea.Cmd
+		m.commandBar, barCmd = m.commandBar.Update(msg)
+
+		if _, isKey := msg.(tea.KeyMsg); isKey {
+			return m, barCmd
+		}
+
+		var screenCmd tea.Cmd
+		m, screenCmd = m.updateActiveScreen(msg)
+		return m, tea.Batch(barCmd, screenCmd)
 	}
 
 	return m.updateActiveScreen(msg)
@@ -61,13 +75,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	title, segments, body := m.activeScreen()
 
-	// Render the body of the active screen (inkl. border)
+	// The header sits above this box, so its rows come off the interior height.
 	box := styles.AppBorder.
 		Width(m.width).
 		Height(max(0, m.height-styles.AppBorderHeightOverhead-components.HeaderHeight)).
 		Render(body)
 
-	// Combine Header and Body into a single view
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		components.Header(m.width, title, segments...),
@@ -84,8 +97,7 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// activeScreen renders the active screen and reports what its title bar
-// should say.
+// activeScreen renders the active screen and reports its title bar.
 func (m Model) activeScreen() (title string, segments []string, body string) {
 	switch m.active {
 	case screenSplash:
@@ -94,14 +106,16 @@ func (m Model) activeScreen() (title string, segments []string, body string) {
 	case screenWorktrees:
 		title, segments = m.worktrees.HeaderContent()
 		return title, segments, m.worktrees.View()
+	case screenBranches:
+		title, segments = m.branches.HeaderContent()
+		return title, segments, m.branches.View()
 	default:
 		title, segments = m.diffView.HeaderContent()
 		return title, segments, m.diffView.View()
 	}
 }
 
-// overlayCommandBar centers the command bar popup in the bordered body,
-// which starts below the header and one column in from the border.
+// overlayCommandBar centers the popup below the header, inside the border.
 func (m Model) overlayCommandBar(content string) string {
 	box := m.commandBar.View()
 	boxW, boxH := lipgloss.Size(box)

@@ -2,11 +2,11 @@ package commandbar
 
 import "charm.land/lipgloss/v2"
 
-// Commands the bar accepts. Add one here and it becomes an input
-// suggestion; handle it in the router's commandbar.SubmitMsg case.
+// Commands the bar accepts. Add one here, then handle it in runCommand.
 const (
 	CommandQuit      = "quit"
 	CommandWorktrees = "worktrees"
+	CommandBranches  = "branches"
 	CommandDiff      = "diff"
 	CommandAccept    = "checkpoint/accept"      // the selected file only
 	CommandAcceptAll = "checkpoint/accept-all"  // every pending file
@@ -22,6 +22,7 @@ type command struct {
 var commandList = []command{
 	{CommandQuit, "quit gdiff"},
 	{CommandWorktrees, "browse worktrees"},
+	{CommandBranches, "browse branches"},
 	{CommandDiff, "back to the diff view"},
 	{CommandAccept, "accept the selected file"},
 	{CommandAcceptAll, "accept every pending file"},
@@ -29,6 +30,7 @@ var commandList = []command{
 	{CommandRejectAll, "reject every pending file"},
 }
 
+// Commands lists the names in declaration order, which is suggestion order.
 var Commands = func() []string {
 	names := make([]string, len(commandList))
 	for i, c := range commandList {
@@ -45,9 +47,7 @@ var descriptions = func() map[string]string {
 	return m
 }()
 
-// descColWidth is the suggestion list's description column width, derived
-// from the longest description rather than hand-picked, so it can't go
-// stale as commandList changes.
+// descColWidth comes from the longest description, so it can't go stale.
 var descColWidth = func() int {
 	w := 0
 	for _, c := range commandList {

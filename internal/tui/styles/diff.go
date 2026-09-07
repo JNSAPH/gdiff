@@ -2,8 +2,7 @@ package styles
 
 import "charm.land/lipgloss/v2"
 
-// Diff line backgrounds and their matching text colors, kept as a pair so an
-// added line's green text always sits on the green band.
+// Backgrounds paired with their text colors, so green sits on the green band.
 const (
 	addedLineFgHex   = "#7EE787"
 	addedLineBgHex   = "#10261A"
@@ -11,8 +10,8 @@ const (
 	deletedLineBgHex = "#2C1416"
 )
 
-// Diff line styles. These color a whole row, so the caller pads the text to
-// the pane's width first — see diffview's renderDiff.
+// Diff line styles color a whole row, so the caller pads the text to the pane
+// width first — see diffview's renderDiff.
 var (
 	AddedLine = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(addedLineFgHex)).
@@ -33,8 +32,7 @@ var (
 	GutterDeleted = lipgloss.NewStyle().Foreground(DeletedColor).Bold(true)
 )
 
-// RowStyles is the set of styles one sidebar row is drawn with. Grouping
-// them keeps the selected row's background on every part of the row.
+// RowStyles keeps the selected row's background on every part of the row.
 type RowStyles struct {
 	Row    lipgloss.Style // the background band, and the padding after the text
 	Accent lipgloss.Style // the bar down the row's left edge
@@ -43,8 +41,7 @@ type RowStyles struct {
 	Name   lipgloss.Style // the path's final segment, the part worth reading
 }
 
-// RowHeader draws a path outside the sidebar, e.g. above the diff pane,
-// where there's no selection band behind it.
+// RowHeader draws a path outside the sidebar, with no selection band behind it.
 var RowHeader = RowStyles{
 	Row:   lipgloss.NewStyle(),
 	Dir:   lipgloss.NewStyle().Foreground(MutedColor),
