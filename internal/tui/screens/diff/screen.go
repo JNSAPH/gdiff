@@ -16,11 +16,9 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// marquee speed
-const scrollTickInterval = 300 * time.Millisecond
-
-// tickMsg advances the selected file's marquee scroll.
-type tickMsg struct{}
+// ScrollTickInterval is how often the selected row's marquee advances. The
+// router drives it, so the interval lives here but the timer does not.
+const ScrollTickInterval = 300 * time.Millisecond
 
 // focus identifies which pane has keyboard focus.
 type focus int
@@ -30,6 +28,8 @@ const (
 	focusContent
 )
 
+// Model is the diff screen's state: the repository, the files it found, and
+// the diff of whichever one the cursor is on.
 type Model struct {
 	gitPath string
 	repo    *git.Repo
@@ -86,22 +86,16 @@ func newViewport() viewport.Model {
 	return vp
 }
 
-// Init returns the commands the screen needs while it's active.
+// Init returns the commands the screen needs while it's active. The marquee
+// runs off the router's clock, not this screen's, so there are none.
 func (m Model) Init() tea.Cmd {
-	return tick()
-}
-
-func tick() tea.Cmd {
-	return tea.Tick(scrollTickInterval, func(time.Time) tea.Msg { return tickMsg{} })
+	return nil
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.resize(msg.Width, msg.Height), nil
-
-	case tickMsg:
-		return m.advanceScroll(), tick()
 
 	case tea.MouseWheelMsg:
 		if m.focus == focusSidebar {

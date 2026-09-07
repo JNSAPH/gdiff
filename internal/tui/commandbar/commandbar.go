@@ -44,7 +44,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	// Get Matched Suggestions
 	suggestions := m.input.MatchedSuggestions()
 	current := m.input.CurrentSuggestionIndex()
 

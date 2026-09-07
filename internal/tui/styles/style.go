@@ -51,8 +51,8 @@ var (
 	// Muted is for text that should recede, e.g. a path's directory.
 	Muted = lipgloss.NewStyle().Foreground(MutedColor)
 
-	// Subtle is for chrome that should barely register, e.g. a scrollbar
-	// track or the gutter's separator.
+	// Subtle is for chrome that should barely register, e.g. the gutter's
+	// line numbers or its separator.
 	Subtle = lipgloss.NewStyle().Foreground(SubtleColor)
 
 	// BorderLine styles border and divider runes drawn by hand, i.e. not

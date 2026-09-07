@@ -9,6 +9,8 @@ type Model struct {
 	elapsed       time.Duration
 }
 
+// New builds the splash screen. It sizes itself from the first
+// tea.WindowSizeMsg, so the zero value is a valid starting state.
 func New() Model {
 	return Model{}
 }

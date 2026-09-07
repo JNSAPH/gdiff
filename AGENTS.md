@@ -255,6 +255,8 @@ Longer comments are wanted in exactly two places: a decision worth recording, an
 
 Doc comments: every exported identifier gets one, starting with its name, in the imperative. Each package gets a package comment on one file. Document a parameter only when its meaning isn't obvious from the name and type. Unexported helpers get none; the name and signature are the contract.
 
+The one exception is the screen convention — `Init`, `Update`, `View` and `HeaderContent`. The shape is documented once under **Architecture**; a doc comment on each implementation would only restate the signature. Leave them bare.
+
 ## Typing and naming
 
 - Give data a named type where it **changes shape or gains meaning** — `FileChange`, `DiffLine`, `Worktree`, `diffBase`. Leave pass-through shapes plain.
@@ -335,7 +337,7 @@ slog.Info("checkpoint accepted", "path", change.Path, "files", len(m.files))
 
 There is no test suite yet. When adding one:
 
-- Test **pure logic**: `git.lineDiff`, `git.parsePorcelainStatus`, `git.parseWorktreeList`, `diffview.scrollWindow`/`truncateFront`, `components.fillAround`. Code with real branching and no terminal.
+- Test **pure logic**: `git.lineDiff`, `git.parsePorcelainStatus`, `git.parseWorktreeList`, `diffview.scrollWindow`/`truncateFront`/`truncateTail`/`pad`, `components.fillAround`. Code with real branching and no terminal.
 - Skip tests of `Update` wiring and rendered output unless asked. Golden-file tests of a TUI break on every style tweak and prove little.
 - Only write a test that can fail for a real reason.
 
@@ -354,6 +356,12 @@ There is no test suite yet. When adding one:
 - **`loadDiff` reads git; `renderDiff` only redraws.** The diff stays on the model as
   `m.diffLines`, so a resize re-renders without touching git. Keep that split — don't
   read git from a render path.
+- **The router owns the marquee ticker, not the diff screen.** A screen that
+  re-arms its own `tea.Tick` from its `Update` loses the chain the moment one
+  fires while another screen or the command bar is handling messages, and
+  starts a second chain every time the screen is re-entered. Both happened.
+  `marqueeTick` lives in `tui` and re-arms unconditionally, so exactly one
+  chain runs for the app's lifetime. Don't move it back into `diffview`.
 - **Checkpoint operations write to the working tree.** `RejectCheckpoint*` overwrites
   and deletes real files. Treat anything in `git/checkpoint.go` as destructive and
   read the whole function before changing it.

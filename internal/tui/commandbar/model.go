@@ -13,6 +13,8 @@ type Model struct {
 	input textinput.Model
 }
 
+// New builds the command bar, closed, with its input pre-loaded with the
+// command names as suggestions.
 func New() Model {
 	input := textinput.New()
 	input.Prompt = ": "

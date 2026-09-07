@@ -11,7 +11,7 @@ import (
 )
 
 // sidebar renders the left panel: the header, then the visible window of the
-// file list with a scrollbar down its right edge.
+// file list.
 func (m Model) sidebar(height int) string {
 	width := m.sidebarW() - components.SidebarBorderWidth
 	rows := max(0, height-sidebarHeaderHeight)
@@ -25,7 +25,7 @@ func (m Model) sidebar(height int) string {
 }
 
 // fileRows renders the visible slice of the file list, one row per line,
-// with the scrollbar occupying the last column.
+// padded out to the panel's full height.
 func (m Model) fileRows(width, rows int) string {
 	if rows <= 0 {
 		return ""
@@ -36,8 +36,8 @@ func (m Model) fileRows(width, rows int) string {
 
 	list := fileList(window, m.listOffset, m.cursor, m.scrollOffset, width-1)
 
-	// Pair each row with its scrollbar cell, padding out any rows the file
-	// list didn't fill so the scrollbar still spans the panel.
+	// Every row is padded to the same width, and rows the file list didn't
+	// fill are left blank, so a short list still fills the panel.
 	lines := make([]string, rows)
 	listLines := strings.Split(list, "\n")
 

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/JNSAPH/gdiff/internal/tui/commandbar"
@@ -35,6 +37,8 @@ type Model struct {
 	commandBar commandbar.Model
 }
 
+// NewModel builds the root model with every screen constructed up front.
+// The screens stay unsized until the first tea.WindowSizeMsg reaches resize.
 func NewModel(gitPath string) Model {
 	return Model{
 		diffView:   diffview.New(gitPath),
@@ -62,6 +66,24 @@ func (m Model) closeCommandBar() (Model, tea.Cmd) {
 	return m, nil
 }
 
+// marqueeTickMsg steps the diff view's filename scroll.
+type marqueeTickMsg struct{}
+
+// marqueeTick schedules the next marquee step. The router owns this timer so
+// exactly one chain runs for the app's lifetime: a screen re-arming its own
+// tick loses it the moment a message is routed elsewhere, and starts a second
+// one every time the screen is re-entered.
+func marqueeTick() tea.Cmd {
+	return tea.Tick(diffview.ScrollTickInterval, func(time.Time) tea.Msg { return marqueeTickMsg{} })
+}
+
+// advanceMarquee steps the scroll and re-arms the timer. It re-arms
+// unconditionally, whatever screen is showing, so the chain can't die.
+func (m Model) advanceMarquee() (Model, tea.Cmd) {
+	m.diffView = m.diffView.AdvanceScroll()
+	return m, marqueeTick()
+}
+
 // showDiffView switches to the diff view and starts its commands.
 func (m Model) showDiffView() (Model, tea.Cmd) {
 	m.active = screenDiffView
@@ -69,7 +91,12 @@ func (m Model) showDiffView() (Model, tea.Cmd) {
 }
 
 // showWorktrees switches to the worktrees screen and starts its commands.
+// Already being there is a no-op, so ":worktrees" doesn't re-list them.
 func (m Model) showWorktrees() (Model, tea.Cmd) {
+	if m.active == screenWorktrees {
+		return m, nil
+	}
+
 	m.active = screenWorktrees
 	return m, m.worktrees.Init()
 }

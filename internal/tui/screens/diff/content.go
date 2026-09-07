@@ -221,7 +221,7 @@ func (m Model) gutterWidth() int {
 
 // pad right-aligns s in width columns.
 func pad(s string, width int) string {
-	if n := width - len(s); n > 0 {
+	if n := width - lipgloss.Width(s); n > 0 {
 		return strings.Repeat(" ", n) + s
 	}
 	return s

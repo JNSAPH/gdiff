@@ -29,6 +29,8 @@ var commandList = []command{
 	{CommandRejectAll, "reject every pending file"},
 }
 
+// Commands lists the command names in the order commandList declares them,
+// which is the order the input offers them as suggestions.
 var Commands = func() []string {
 	names := make([]string, len(commandList))
 	for i, c := range commandList {

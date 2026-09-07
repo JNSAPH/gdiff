@@ -42,6 +42,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&gitPath, "path", "p", ".", "Path to the git repository")
 }
 
+// Execute runs the root command and exits non-zero on failure.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "gdiff:", err)

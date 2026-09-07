@@ -68,7 +68,9 @@ func (m Model) clampListOffset() Model {
 	return m
 }
 
-func (m Model) advanceScroll() Model {
+// AdvanceScroll steps the selected row's marquee on by one column. The
+// router calls it on its own clock; scrollWindow wraps the offset.
+func (m Model) AdvanceScroll() Model {
 	m.scrollOffset++
 	return m
 }
