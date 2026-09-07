@@ -1,0 +1,53 @@
+# Cross-compiles the tag, publishes a GitHub release, and pushes a Homebrew cask
+# to JNSAPH/homebrew-taps. Reference: https://goreleaser.com
+version: 2
+
+project_name: gdiff
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    # -s -w drops the symbol table; the -X sets what `gdiff --version` prints.
+    ldflags:
+      - -s -w -X github.com/JNSAPH/gdiff/cmd.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+homebrew_casks:
+  - name: gdiff
+    binaries: [gdiff]
+    homepage: https://github.com/JNSAPH/gdiff
+    description: Browse a git repository's changes in the terminal
+    repository:
+      owner: JNSAPH
+      name: homebrew-taps
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaserbot@users.noreply.github.com
+    hooks:
+      post:
+        install: |
+          if OS.mac? && system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/gdiff"]
+          end
