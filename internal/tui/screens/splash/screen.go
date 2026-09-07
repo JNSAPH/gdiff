@@ -67,7 +67,7 @@ func (m Model) View() string {
 			lipgloss.Center,
 			styles.BrandTitle.Render("gdiff"),
 			" ",
-			styles.Subtle.Render("v"+core.Version),
+			styles.Subtle.Render(core.Version),
 		),
 		styles.Muted.Render("by aph"),
 		"",
