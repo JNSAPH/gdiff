@@ -2,6 +2,7 @@ package diffview
 
 import (
 	"github.com/JNSAPH/gdiff/internal/git"
+	"github.com/JNSAPH/gdiff/internal/tui/components"
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
@@ -12,6 +13,7 @@ func (m Model) resize(width, height int) Model {
 
 	m.viewport.SetWidth(m.contentWidth())
 	m.viewport.SetHeight(max(0, m.bodyHeight()-contentHeaderHeight-m.tabsHeight()))
+	m.filter.SetWidth(m.filterWidth())
 
 	// The diff's rows are padded to the pane's width, so a resize has to
 	// re-render them — but not re-read them.
@@ -22,6 +24,14 @@ func (m Model) resize(width, height int) Model {
 // footer has taken its rows.
 func (m Model) bodyHeight() int {
 	return max(0, m.height-m.footerHeight())
+}
+
+// filterWidth is the room the input has, less the column its prompt takes.
+func (m Model) filterWidth() int {
+	if m.narrow() {
+		return max(0, m.width-1)
+	}
+	return max(0, m.sidebarW()-components.SidebarBorderWidth-1)
 }
 
 // listRows is how many file rows the sidebar can show at once.
@@ -44,6 +54,14 @@ func (m Model) selectNext() Model {
 		m.cursor++
 		m.scrollOffset = 0
 	}
+	return m.clampListOffset().loadDiff()
+}
+
+// refreshList re-derives the display list; route every change through it.
+func (m Model) refreshList() Model {
+	m = m.applySort().applyFilter()
+	m.cursor = max(0, min(m.cursor, len(m.files)-1))
+
 	return m.clampListOffset().loadDiff()
 }
 
@@ -92,6 +110,9 @@ func (m Model) loadDiff() Model {
 
 	file, ok := m.selected()
 	if !ok {
+		if m.filterActive() && len(m.allFiles) > 0 {
+			return m.showMessage(styles.Muted.Render("No files match the filter"))
+		}
 		return m.showMessage(styles.Muted.Render("No changes"))
 	}
 
@@ -197,10 +218,9 @@ func (m Model) refreshGit() Model {
 	}
 
 	m.loadErr = nil
-	m.files = files
+	m.allFiles = files
 	m.repoName = m.repo.Name()
 	m.branch = m.repo.Branch()
-	m.cursor = min(m.cursor, max(0, len(m.files)-1))
 
-	return m.applySort().clampListOffset().loadDiff()
+	return m.refreshList()
 }

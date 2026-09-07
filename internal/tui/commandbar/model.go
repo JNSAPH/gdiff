@@ -21,30 +21,10 @@ func New() Model {
 	input.Placeholder = "type a command"
 	input.ShowSuggestions = true
 	input.SetSuggestions(Commands)
-	input.SetStyles(inputStyles())
+	input.SetStyles(styles.TextInput())
 	input.SetWidth(styles.CommandBarInnerWidth)
 
 	return Model{input: input}
-}
-
-// inputStyles paints the text input in the app's palette, dimming it while
-// it doesn't have focus.
-func inputStyles() textinput.Styles {
-	s := textinput.DefaultDarkStyles()
-
-	s.Focused.Prompt = styles.BrandTitle
-	s.Focused.Text = styles.Text
-	s.Focused.Placeholder = styles.Subtle
-	s.Focused.Suggestion = styles.Subtle
-
-	s.Blurred.Prompt = styles.Subtle
-	s.Blurred.Text = styles.Muted
-	s.Blurred.Placeholder = styles.Subtle
-	s.Blurred.Suggestion = styles.Subtle
-
-	s.Cursor.Color = styles.BrandColor
-
-	return s
 }
 
 func (m Model) close() (Model, tea.Cmd) {

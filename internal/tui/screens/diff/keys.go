@@ -19,6 +19,9 @@ type keyMap struct {
 	ToggleLayout    key.Binding
 	SortMode        key.Binding
 	SortModeReverse key.Binding
+	Filter          key.Binding
+	FilterApply     key.Binding
+	FilterCancel    key.Binding
 	ToggleBase      key.Binding
 	Accept          key.Binding
 	AcceptAll       key.Binding
@@ -27,6 +30,9 @@ type keyMap struct {
 	OpenCommandBar  key.Binding
 	Refresh         key.Binding
 	Quit            key.Binding
+
+	// filterFocus narrows ShortHelp to the two keys that end the filter.
+	filterFocus bool
 
 	// checkpointFocus trims ShortHelp to the keys relevant to reviewing a
 	// checkpoint, dropping ones common enough elsewhere not to need a
@@ -81,6 +87,19 @@ var keys = keyMap{
 		key.WithKeys("S"),
 		key.WithHelp("S", "cycle sort (reverse)"),
 	),
+	Filter: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "filter"),
+	),
+	// Matched only while filtering, where enter and esc aren't Open and Back.
+	FilterApply: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "apply filter"),
+	),
+	FilterCancel: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "clear filter"),
+	),
 	ToggleBase: key.NewBinding(
 		key.WithKeys("b"),
 		key.WithHelp("b", "toggle diff base"),
@@ -111,6 +130,9 @@ var keys = keyMap{
 // checkpointFocus mode, Tab/SortMode/Refresh give way to the checkpoint
 // actions — they're still one "?" away in FullHelp.
 func (k keyMap) ShortHelp() []key.Binding {
+	if k.filterFocus {
+		return []key.Binding{k.FilterApply, k.FilterCancel}
+	}
 	if k.checkpointFocus {
 		return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Accept, k.AcceptAll, k.Reject, k.Help, k.Quit}
 	}
@@ -122,7 +144,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
 		{k.Tab, k.Open, k.Back},
-		{k.SortMode, k.SortModeReverse, k.Refresh},
+		{k.SortMode, k.SortModeReverse, k.Filter, k.Refresh},
 		{k.ToggleBase, k.Accept, k.AcceptAll, k.Reject},
 		{k.ToggleLayout, k.Help, k.OpenCommandBar, k.Quit},
 	}
@@ -132,6 +154,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 // and Update's dispatch, so a disabled binding neither shows nor fires.
 func (m Model) activeKeys() keyMap {
 	k := keys
+	k.filterFocus = m.filtering
 
 	// The file list is either a sidebar or a tab strip, so only one pair of
 	// arrows moves through it at a time.

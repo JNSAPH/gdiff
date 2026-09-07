@@ -84,6 +84,11 @@ func (m Model) advanceMarquee() (Model, tea.Cmd) {
 	return m, marqueeTick()
 }
 
+// capturesInput reports whether the active screen is taking typed text.
+func (m Model) capturesInput() bool {
+	return m.active == screenDiffView && m.diffView.CapturesInput()
+}
+
 // showDiffView switches to the diff view and starts its commands.
 func (m Model) showDiffView() (Model, tea.Cmd) {
 	m.active = screenDiffView

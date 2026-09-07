@@ -52,17 +52,36 @@ func (m Model) fileRows(width, rows int) string {
 	return strings.Join(lines, "\n")
 }
 
-// sidebarHeader renders the sort state, then the file count centered in a
-// divider.
+// sidebarHeader renders the sort state or filter, then the file count.
 func (m Model) sidebarHeader(width int) string {
 	count := " " + strconv.Itoa(len(m.files)) + " files "
 	if len(m.files) == 1 {
 		count = " 1 file "
 	}
 
+	// One row, two things that want it: the filter wins while it's in play.
+	first := m.sortLabel(width)
+	if m.filterActive() {
+		first = m.filterRow(width)
+	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.sortLabel(width),
+		first,
 		components.Rule(width, styles.Muted.Render(count), styles.BorderLine),
 	)
+}
+
+// listPosition is the cursor's place in the file list, e.g. "3/32".
+func (m Model) listPosition() string {
+	if len(m.files) == 0 {
+		return ""
+	}
+	return styles.Subtle.Render(strconv.Itoa(m.cursor+1) + "/" + strconv.Itoa(len(m.files)))
+}
+
+// spread pushes left and right to opposite ends of a row width columns wide.
+func spread(left, right string, width int) string {
+	gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
+	return left + strings.Repeat(" ", gap) + right
 }

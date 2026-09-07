@@ -154,7 +154,15 @@ func tabWindow(labels []string, cursor, width int) (start, end int) {
 // cursor position the sidebar's header would show. It takes the accent color
 // when the tabs have focus, standing in for the sidebar's focused border.
 func (m Model) tabsDivider(width int) string {
+	// Only two rows here, so the divider gives way to the input while typing.
+	if m.filtering {
+		return clamp(m.filter.View(), width)
+	}
+
 	label := " " + styles.Subtle.Render("sort ") + styles.Muted.Render(sortOptions[m.sortIndex].label)
+	if m.filterActive() {
+		label = " " + styles.BrandTitle.Render("/") + styles.Text.Render(m.filter.Value())
+	}
 	if len(m.files) > 0 {
 		label += styles.BorderLine.Render(" · ") +
 			styles.Subtle.Render(strconv.Itoa(m.cursor+1)+"/"+strconv.Itoa(len(m.files)))

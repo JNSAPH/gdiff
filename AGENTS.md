@@ -243,7 +243,14 @@ func (m Model) fileRows(width, rows int) string {
 
 ## Comments and doc comments
 
-Default: **one line, above the block it describes.**
+Default: **one line, above the block it describes.** Two is already the exception, and only for a *why* that won't fit on one; three or more belongs to the two cases at the end of this section. A doc comment on a short function is one line — if you find yourself writing what it does *and* why *and* how it fits the screen, keep the why and cut the rest.
+
+```go
+// filterActive reports whether a query is narrowing the list.   // yes
+
+// filterActive reports whether a query is narrowing the list, whether it's
+// still being typed or already locked in.                       // no — the second line adds nothing
+```
 
 Worth a comment: what a block does when the code takes a moment to read; why a decision was made when a reader can't infer it; a workaround for an upstream bug (link the issue); anything that behaves surprisingly.
 

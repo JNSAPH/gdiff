@@ -22,8 +22,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Global keys, but only while the command bar has no focus.
-		if !m.showCommandBar {
+		// Global keys, unless something else owns the keyboard — "q" would quit.
+		if !m.showCommandBar && !m.capturesInput() {
 			switch {
 			case key.Matches(msg, global.Quit):
 				return m.quitApp()
