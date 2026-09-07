@@ -11,9 +11,12 @@ import (
 type keyMap struct {
 	Up              key.Binding
 	Down            key.Binding
+	Left            key.Binding
+	Right           key.Binding
 	Open            key.Binding
 	Back            key.Binding
 	Tab             key.Binding
+	ToggleLayout    key.Binding
 	SortMode        key.Binding
 	SortModeReverse key.Binding
 	ToggleBase      key.Binding
@@ -40,6 +43,15 @@ var keys = keyMap{
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
 	),
+	// Left/Right replace Up/Down once the file list is a tab strip.
+	Left: key.NewBinding(
+		key.WithKeys("left", "h"),
+		key.WithHelp("←/h", "prev file"),
+	),
+	Right: key.NewBinding(
+		key.WithKeys("right", "l"),
+		key.WithHelp("→/l", "next file"),
+	),
 	Open: key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "open"),
@@ -52,6 +64,10 @@ var keys = keyMap{
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "switch pane"),
+	),
+	ToggleLayout: key.NewBinding(
+		key.WithKeys("ctrl+s"),
+		key.WithHelp("ctrl+s", "tabs/sidebar"),
 	),
 	Refresh: key.NewBinding(
 		key.WithKeys("r"),
@@ -96,18 +112,42 @@ var keys = keyMap{
 // actions — they're still one "?" away in FullHelp.
 func (k keyMap) ShortHelp() []key.Binding {
 	if k.checkpointFocus {
-		return []key.Binding{k.Up, k.Down, k.Accept, k.AcceptAll, k.Reject, k.Help, k.Quit}
+		return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Accept, k.AcceptAll, k.Reject, k.Help, k.Quit}
 	}
-	return []key.Binding{k.Up, k.Down, k.Tab, k.SortMode, k.Help, k.Refresh, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Tab, k.SortMode, k.Help, k.Refresh, k.Quit}
 }
 
 // FullHelp returns the bindings shown in the expanded, multi-column help.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down},
-		{k.Open, k.Back},
+		{k.Up, k.Down, k.Left, k.Right},
+		{k.Tab, k.Open, k.Back},
 		{k.SortMode, k.SortModeReverse, k.Refresh},
 		{k.ToggleBase, k.Accept, k.AcceptAll, k.Reject},
-		{k.Tab, k.Help, k.OpenCommandBar, k.Quit},
+		{k.ToggleLayout, k.Help, k.OpenCommandBar, k.Quit},
 	}
+}
+
+// activeKeys is the keymap as it applies right now. It feeds both the footer
+// and Update's dispatch, so a disabled binding neither shows nor fires.
+func (m Model) activeKeys() keyMap {
+	k := keys
+
+	// The file list is either a sidebar or a tab strip, so only one pair of
+	// arrows moves through it at a time.
+	narrow := m.narrow()
+	k.Up.SetEnabled(!narrow)
+	k.Down.SetEnabled(!narrow)
+	k.Left.SetEnabled(narrow)
+	k.Right.SetEnabled(narrow)
+
+	// Accept/reject only mean something against a checkpoint, and the short
+	// help narrows to those keys rather than advertising ones that no-op.
+	inCheckpoint := m.base == baseCheckpoint
+	k.Accept.SetEnabled(inCheckpoint)
+	k.AcceptAll.SetEnabled(inCheckpoint)
+	k.Reject.SetEnabled(inCheckpoint)
+	k.checkpointFocus = inCheckpoint
+
+	return k
 }

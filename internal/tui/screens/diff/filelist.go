@@ -108,3 +108,25 @@ func truncateFront(name string, maxWidth int) string {
 
 	return ellipsis + string(runes[len(runes)-keep:])
 }
+
+// truncateTail shortens name to maxWidth by dropping characters from the
+// end. The counterpart to truncateFront, for a bare file name — there the
+// front is the identifying part.
+func truncateTail(name string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+
+	runes := []rune(name)
+	if len(runes) <= maxWidth {
+		return name
+	}
+
+	const ellipsis = "…"
+	keep := maxWidth - 1 // the ellipsis takes one column
+	if keep <= 0 {
+		return ellipsis
+	}
+
+	return string(runes[:keep]) + ellipsis
+}

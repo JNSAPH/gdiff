@@ -19,20 +19,6 @@ func (b diffBase) label() string {
 	return "HEAD"
 }
 
-// helpKeys is the keymap for the footer's help bar: Accept/AcceptAll/Reject
-// only shown while they'd actually do something, and the short line
-// narrowed to checkpoint-review keys rather than advertising ones that are
-// no-ops here.
-func (m Model) helpKeys() keyMap {
-	k := keys
-	inCheckpoint := m.base == baseCheckpoint
-	k.Accept.SetEnabled(inCheckpoint)
-	k.AcceptAll.SetEnabled(inCheckpoint)
-	k.Reject.SetEnabled(inCheckpoint)
-	k.checkpointFocus = inCheckpoint
-	return k
-}
-
 // toggleBase flips between the two bases and reloads against the new one.
 func (m Model) toggleBase() Model {
 	if m.base == baseCheckpoint {

@@ -12,16 +12,9 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// contentHeaderHeight is how many rows contentHeader always renders.
-const contentHeaderHeight = 1
-
 // tabWidth is how many columns a tab in a diff expands to. Fixed so the
 // gutter stays aligned whatever the terminal does with tabs.
 const tabWidth = 4
-
-// minStatusWidth is the narrowest content pane that still shows the diff
-// stats and scroll position beside the file name.
-const minStatusWidth = 34
 
 // content renders the right-hand pane: the selected file's path, then the
 // diff viewport below it.
@@ -34,8 +27,12 @@ func (m Model) content() string {
 }
 
 // sidebarW is the sidebar's width. It keeps its preferred width until the
-// terminal gets narrow, then gives way so the diff pane stays usable.
+// terminal gets narrow, then gives way so the diff pane stays usable — and
+// once the tabs take over, it takes no width at all.
 func (m Model) sidebarW() int {
+	if m.narrow() {
+		return 0
+	}
 	return min(sidebarWidth, max(minSidebarWidth, m.width/3))
 }
 
@@ -141,18 +138,20 @@ func (m Model) renderDiff() Model {
 	m.viewport.LeftGutterFunc = m.diffGutter
 	m.viewport.StyleLineFunc = m.diffLineStyle
 
-	width := max(0, m.viewport.Width()-m.gutterWidth())
-
 	lines := make([]string, len(m.diffLines))
+	longest := 0
 	for i, l := range m.diffLines {
-		text := strings.ReplaceAll(l.Text, "\t", strings.Repeat(" ", tabWidth))
+		lines[i] = strings.ReplaceAll(l.Text, "\t", strings.Repeat(" ", tabWidth))
+		longest = max(longest, lipgloss.Width(lines[i]))
+	}
 
-		// Pad short lines so the band reaches the pane's edge. Long ones are
-		// left alone — the viewport scrolls to them.
+	// Pad to the longest line, not just the pane: scrolling sideways moves
+	// past the pane's width, and a band that stopped there would run out.
+	width := max(m.viewport.Width()-m.gutterWidth(), longest)
+	for i, text := range lines {
 		if pad := width - lipgloss.Width(text); pad > 0 {
-			text += strings.Repeat(" ", pad)
+			lines[i] = text + strings.Repeat(" ", pad)
 		}
-		lines[i] = text
 	}
 
 	m.viewport.SetContentLines(lines)

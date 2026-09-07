@@ -21,12 +21,18 @@ func NewHelp() help.Model {
 	return h
 }
 
+// footerPadding is the columns the bar keeps clear on each side.
+const footerPadding = 1
+
 // Footer renders a screen's bottom help bar: a top border, then h's view of
 // keys.
 func Footer(width int, h help.Model, keys help.KeyMap) string {
+
+	h.SetWidth(max(0, width-2*footerPadding))
+
 	return lipgloss.NewStyle().
 		Width(width).
-		Padding(0, 1).
+		Padding(0, footerPadding).
 		BorderTop(true).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(styles.BorderColor).
