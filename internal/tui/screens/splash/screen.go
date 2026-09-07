@@ -66,8 +66,7 @@ func (m Model) View() string {
 	block := lipgloss.JoinVertical(
 		lipgloss.Center,
 		styles.BrandTitle.Render("gdiff"),
-		"",
-		styles.Muted.Render("by oovolabs"),
+		styles.Muted.Render("by aph"),
 		"",
 		styles.Subtle.Render("press any key to continue"),
 	)
