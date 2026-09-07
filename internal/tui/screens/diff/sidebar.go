@@ -10,10 +10,6 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// sidebarHeaderHeight is how many rows sit above the file list: the sort
-// state and the file-count divider.
-const sidebarHeaderHeight = 2
-
 // sidebar renders the left panel: the header, then the visible window of the
 // file list with a scrollbar down its right edge.
 func (m Model) sidebar(height int) string {

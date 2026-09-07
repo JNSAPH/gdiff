@@ -83,7 +83,6 @@ func loadEntry(wt git.Worktree) entry {
 
 func (m Model) resize(width, height int) Model {
 	m.width, m.height = width, height
-	m.help.SetWidth(width)
 	return m.clampListOffset()
 }
 

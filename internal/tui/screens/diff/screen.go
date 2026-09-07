@@ -16,18 +16,8 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
 )
 
-// Sidebar width constraints
-const (
-	sidebarWidth    = 36
-	minSidebarWidth = 18
-)
-
 // marquee speed
 const scrollTickInterval = 300 * time.Millisecond
-
-// statusWidth is the fixed width the scroll percentage is right-aligned in,
-// so the diff stats beside it don't shift as it changes.
-const statusWidth = 4
 
 // tickMsg advances the selected file's marquee scroll.
 type tickMsg struct{}
@@ -56,6 +46,7 @@ type Model struct {
 	sortIndex    int // index into sortOptions
 	base         diffBase
 	focus        focus
+	layout       layoutMode
 
 	// The selected file's diff, kept so the pane can be re-rendered on a
 	// resize without reading git again. When there's none, message says why.
@@ -116,52 +107,56 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.focus == focusSidebar {
 			switch msg.Button {
 			case tea.MouseWheelUp:
-				return m.moveCursorUp(), nil
+				return m.selectPrev(), nil
 			case tea.MouseWheelDown:
-				return m.moveCursorDown(), nil
+				return m.selectNext(), nil
 			case tea.MouseMiddle:
 				return m.setFocus(focusContent), nil
 			}
 		}
 
 	case tea.KeyMsg:
+		k := m.activeKeys()
+
 		// Keys that work in either pane
 		switch {
-		case key.Matches(msg, keys.Help):
+		case key.Matches(msg, k.Help):
 			return m.toggleHelp(), nil
-		case key.Matches(msg, keys.Tab):
+		case key.Matches(msg, k.Tab):
 			return m.toggleFocus(), nil
-		case key.Matches(msg, keys.SortMode):
+		case key.Matches(msg, k.ToggleLayout):
+			return m.toggleLayout(), nil
+		case key.Matches(msg, k.SortMode):
 			return m.cycleSort(false), nil
-		case key.Matches(msg, keys.SortModeReverse):
+		case key.Matches(msg, k.SortModeReverse):
 			return m.cycleSort(true), nil
-		case key.Matches(msg, keys.Refresh):
+		case key.Matches(msg, k.Refresh):
 			return m.refreshGit(), nil
-		case key.Matches(msg, keys.ToggleBase):
+		case key.Matches(msg, k.ToggleBase):
 			return m.toggleBase(), nil
-		case key.Matches(msg, keys.Accept):
+		case key.Matches(msg, k.Accept):
 			return m.AcceptSelectedFile(), nil
-		case key.Matches(msg, keys.AcceptAll):
+		case key.Matches(msg, k.AcceptAll):
 			return m.AcceptCheckpoint(), nil
-		case key.Matches(msg, keys.Reject):
+		case key.Matches(msg, k.Reject):
 			return m.RejectSelectedFile(), nil
 		}
 
 		// Sidebar keys
 		if m.focus == focusSidebar {
 			switch {
-			case key.Matches(msg, keys.Up):
-				return m.moveCursorUp(), nil
-			case key.Matches(msg, keys.Down):
-				return m.moveCursorDown(), nil
-			case key.Matches(msg, keys.Open):
+			case key.Matches(msg, k.Up), key.Matches(msg, k.Left):
+				return m.selectPrev(), nil
+			case key.Matches(msg, k.Down), key.Matches(msg, k.Right):
+				return m.selectNext(), nil
+			case key.Matches(msg, k.Open):
 				return m.setFocus(focusContent), nil
 			}
 			return m, nil
 		}
 
 		// Content pane keys
-		if key.Matches(msg, keys.Back) {
+		if key.Matches(msg, k.Back) {
 			return m.setFocus(focusSidebar), nil
 		}
 	}
@@ -202,6 +197,20 @@ func (m Model) View() string {
 	footer := m.footer()
 	body := m.bodyHeight()
 
+	// To narrow: Tabs on Top
+	if m.narrow() {
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.tabs(m.width),
+			lipgloss.NewStyle().
+				Width(m.width).
+				Height(max(0, body-m.tabsHeight())).
+				Render(m.content()),
+			footer,
+		)
+	}
+
+	// Wide: Sidebar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.NewStyle().
@@ -214,7 +223,7 @@ func (m Model) View() string {
 
 // footer renders the bottom help bar.
 func (m Model) footer() string {
-	return components.Footer(m.width, m.help, m.helpKeys())
+	return components.Footer(m.width, m.help, m.activeKeys())
 }
 
 // footerHeight measures the footer by rendering it, so the layout can't

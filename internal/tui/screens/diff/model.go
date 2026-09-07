@@ -9,10 +9,9 @@ import (
 func (m Model) resize(width, height int) Model {
 	m.width = width
 	m.height = height
-	m.help.SetWidth(width)
 
 	m.viewport.SetWidth(m.contentWidth())
-	m.viewport.SetHeight(max(0, m.bodyHeight()-contentHeaderHeight))
+	m.viewport.SetHeight(max(0, m.bodyHeight()-contentHeaderHeight-m.tabsHeight()))
 
 	// The diff's rows are padded to the pane's width, so a resize has to
 	// re-render them — but not re-read them.
@@ -30,7 +29,9 @@ func (m Model) listRows() int {
 	return max(0, m.bodyHeight()-sidebarHeaderHeight)
 }
 
-func (m Model) moveCursorUp() Model {
+// selectPrev and selectNext step through the file list — up and down the
+// sidebar, or left and right along the tab strip.
+func (m Model) selectPrev() Model {
 	if m.cursor > 0 {
 		m.cursor--
 		m.scrollOffset = 0
@@ -38,7 +39,7 @@ func (m Model) moveCursorUp() Model {
 	return m.clampListOffset().loadDiff()
 }
 
-func (m Model) moveCursorDown() Model {
+func (m Model) selectNext() Model {
 	if m.cursor < len(m.files)-1 {
 		m.cursor++
 		m.scrollOffset = 0
@@ -144,6 +145,18 @@ func (m Model) toggleFocus() Model {
 		return m.setFocus(focusContent)
 	}
 	return m.setFocus(focusSidebar)
+}
+
+// toggleLayout pins the file list to whichever layout isn't showing. Seeding
+// from narrow() means the first press always gives the opposite of what's on
+// screen, toggled before or not.
+func (m Model) toggleLayout() Model {
+	if m.narrow() {
+		m.layout = layoutSidebar
+	} else {
+		m.layout = layoutTabs
+	}
+	return m.resize(m.width, m.height)
 }
 
 // toggleHelp expands or collapses the help bar. That changes the footer's
