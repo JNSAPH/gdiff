@@ -10,6 +10,8 @@ import (
 	"github.com/JNSAPH/gdiff/internal/tui/components"
 	"github.com/JNSAPH/gdiff/internal/tui/global"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/branches"
+	"github.com/JNSAPH/gdiff/internal/tui/screens/commits"
+	diffview "github.com/JNSAPH/gdiff/internal/tui/screens/diff"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/splash"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/worktrees"
 	"github.com/JNSAPH/gdiff/internal/tui/styles"
@@ -46,6 +48,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case branches.SwitchedMsg:
 		return m.openDiffAt(msg.Path)
+
+	case commits.SelectMsg:
+		return m.openCommit(msg.Commit)
+
+	case diffview.CloseCommitMsg:
+		return m.showCommits()
 
 	case commandbar.CloseMsg:
 		return m.closeCommandBar()
@@ -109,6 +117,9 @@ func (m Model) activeScreen() (title string, segments []string, body string) {
 	case screenBranches:
 		title, segments = m.branches.HeaderContent()
 		return title, segments, m.branches.View()
+	case screenCommits:
+		title, segments = m.commits.HeaderContent()
+		return title, segments, m.commits.View()
 	default:
 		title, segments = m.diffView.HeaderContent()
 		return title, segments, m.diffView.View()

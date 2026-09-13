@@ -36,6 +36,7 @@ internal/git/
   worktree.go          worktree listing + porcelain status parsing
   branch.go            branch listing (local + remote, merged by name) and checkout
   checkpoint.go        the checkpoint refs, one per branch: accept/reject, whole-file and per-file
+  commit.go            log listing, one commit's files, and its first-parent diff
 internal/tui/
   app.go               root Init/Update/View — the router
   model.go             root Model + its state transitions
@@ -52,15 +53,18 @@ internal/tui/
     path.go            StyledPath: a path with everything but its last segment dimmed
     sidebar.go         the left panel's chrome
     changetype.go      ChangeTypeColor + ChangeCounts, shared by every screen
+    row.go             PadLeft + Relative: the list screens' right-hand columns
+    truncate.go        TruncateFront/TruncateTail, with the ellipsis measured in columns
   commandbar/          the ":" command popup
     commands.go        the commands the bar accepts
   screens/splash/      startup screen
   screens/worktrees/   worktree list, each with its own change summary
   screens/branches/    branch list; enter checks one out and reopens the diff view
+  screens/commits/     commit list; enter opens that commit's changes in the diff view
   screens/diff/        main screen (package diffview): file sidebar + diff pane
     screen.go          Model, Init/Update/View, header, footer
     model.go           state transitions; loadDiff reads git
-    base.go            diffBase: compare against HEAD or the last checkpoint
+    base.go            diffBase: compare against HEAD, the last checkpoint, or one commit
     consts.go          the widths and header heights more than one file reads
     content.go         diff pane: gutter, bands, content header
     filelist.go        sidebar rows
@@ -347,7 +351,7 @@ slog.Info("checkpoint accepted", "path", change.Path, "files", len(m.files))
 
 There is no test suite yet. When adding one:
 
-- Test **pure logic**: `git.lineDiff`, `git.parsePorcelainStatus`, `git.parseWorktreeList`, `diffview.scrollWindow`/`truncateFront`/`truncateTail`/`pad`, `components.fillAround`. Code with real branching and no terminal.
+- Test **pure logic**: `git.lineDiff`, `git.parsePorcelainStatus`, `git.parseWorktreeList`, `git.parseCommits`, `git.parseNameStatus`, `diffview.scrollWindow`/`pad`, `components.TruncateFront`/`TruncateTail`/`fillAround`. Code with real branching and no terminal.
 - Skip tests of `Update` wiring and rendered output unless asked. Golden-file tests of a TUI break on every style tweak and prove little.
 - Only write a test that can fail for a real reason.
 

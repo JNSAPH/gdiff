@@ -112,12 +112,15 @@ func (m Model) loadDiff() Model {
 
 	var lines []git.DiffLine
 	var err error
-	if m.base == baseCheckpoint {
+	switch m.base {
+	case baseCommit:
+		lines, err = m.repo.FileDiffIn(m.commit.Hash, file)
+	case baseCheckpoint:
 		var ref string
 		if ref, err = m.repo.CheckpointRef(); err == nil {
 			lines, err = m.repo.FileDiffAgainst(ref, file.Name())
 		}
-	} else {
+	default:
 		lines, err = m.repo.FileDiff(file.Name())
 	}
 	if err != nil {
@@ -198,12 +201,15 @@ func (m Model) refreshGit() Model {
 
 	var files []git.FileChange
 	var err error
-	if m.base == baseCheckpoint {
+	switch m.base {
+	case baseCommit:
+		files, err = m.repo.CommitFiles(m.commit.Hash)
+	case baseCheckpoint:
 		var ref string
 		if ref, err = m.repo.CheckpointRef(); err == nil {
 			files, err = git.ChangedFilesAgainst(m.gitPath, ref)
 		}
-	} else {
+	default:
 		files, err = m.repo.ChangedFiles()
 	}
 	if err != nil {

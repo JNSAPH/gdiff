@@ -39,7 +39,7 @@ func fileListItem(file git.FileChange, width int, selected bool, scrollOffset in
 	if selected {
 		name = scrollWindow(name, scrollOffset, available)
 	} else {
-		name = truncateFront(name, available)
+		name = components.TruncateFront(name, available)
 	}
 
 	row := bar + s.Row.Render(" ") + glyph + s.Row.Render(" ") + components.StyledPath(name, s)
@@ -73,44 +73,4 @@ func scrollWindow(name string, scrollOffset, maxWidth int) string {
 	}
 
 	return string(window)
-}
-
-// truncateFront drops characters from the front, keeping a path's tail.
-func truncateFront(name string, maxWidth int) string {
-	if maxWidth <= 0 {
-		return ""
-	}
-
-	runes := []rune(name)
-	if len(runes) <= maxWidth {
-		return name
-	}
-
-	const ellipsis = "…"
-	keep := maxWidth - 1 // the ellipsis takes one column
-	if keep <= 0 {
-		return ellipsis
-	}
-
-	return ellipsis + string(runes[len(runes)-keep:])
-}
-
-// truncateTail drops them from the end, for a name whose front identifies it.
-func truncateTail(name string, maxWidth int) string {
-	if maxWidth <= 0 {
-		return ""
-	}
-
-	runes := []rune(name)
-	if len(runes) <= maxWidth {
-		return name
-	}
-
-	const ellipsis = "…"
-	keep := maxWidth - 1 // the ellipsis takes one column
-	if keep <= 0 {
-		return ellipsis
-	}
-
-	return string(runes[:keep]) + ellipsis
 }

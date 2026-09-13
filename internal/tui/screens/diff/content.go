@@ -62,7 +62,7 @@ func (m Model) contentHeader(width int) string {
 
 	// Two columns held back: the trailing space, and one before the status.
 	room := max(0, width-lipgloss.Width(prefix)-lipgloss.Width(status)-2)
-	label := prefix + components.StyledPath(truncateFront(file.Name(), room), styles.RowHeader)
+	label := prefix + components.StyledPath(components.TruncateFront(file.Name(), room), styles.RowHeader)
 
 	gap := max(0, width-lipgloss.Width(label)-lipgloss.Width(status)-1)
 

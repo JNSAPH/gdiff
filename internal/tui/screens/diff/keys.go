@@ -33,9 +33,11 @@ type keyMap struct {
 	// filterFocus narrows ShortHelp to the two keys that end the filter.
 	filterFocus bool
 
-	// checkpointFocus trims ShortHelp to the checkpoint keys. FullHelp ignores
-	// it, so "?" still shows everything.
+	// checkpointFocus trims ShortHelp to the checkpoint keys, and commitFocus
+	// gives esc a place in it. FullHelp ignores both, so "?" still shows
+	// everything.
 	checkpointFocus bool
+	commitFocus     bool
 }
 
 var keys = keyMap{
@@ -132,6 +134,9 @@ func (k keyMap) ShortHelp() []key.Binding {
 	if k.checkpointFocus {
 		return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Accept, k.AcceptAll, k.Reject, k.Help, k.Quit}
 	}
+	if k.commitFocus {
+		return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Tab, k.SortMode, k.Back, k.Help, k.Quit}
+	}
 	return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Tab, k.SortMode, k.Help, k.Refresh, k.Quit}
 }
 
@@ -166,6 +171,17 @@ func (m Model) activeKeys() keyMap {
 	k.AcceptAll.SetEnabled(inCheckpoint)
 	k.Reject.SetEnabled(inCheckpoint)
 	k.checkpointFocus = inCheckpoint
+
+	// A commit is a fixed base, so b has nothing to toggle. Esc leaves for the
+	// commits screen, but only from the sidebar — in the diff pane it still
+	// unfocuses first, and says so.
+	if m.viewingCommit() {
+		k.ToggleBase.SetEnabled(false)
+		k.commitFocus = true
+		if m.focus == focusSidebar {
+			k.Back.SetHelp("esc", "back to commits")
+		}
+	}
 
 	return k
 }
