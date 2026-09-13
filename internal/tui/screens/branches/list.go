@@ -3,7 +3,6 @@ package branches
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -38,9 +37,9 @@ func row(b git.Branch, width int, selected bool) string {
 	}
 
 	left := bar + s.Row.Render(" ") + components.StyledPath(b.Name, s)
-	right := padLeft(currentMark(b, s), currentWidth, s.Row) +
-		padLeft(trackState(b, s), trackWidth, s.Row) +
-		padLeft(s.Dir.Render(relative(b.Updated)), dateWidth, s.Row)
+	right := components.PadLeft(currentMark(b, s), currentWidth, s.Row) +
+		components.PadLeft(trackState(b, s), trackWidth, s.Row) +
+		components.PadLeft(s.Dir.Render(components.Relative(b.Updated)), dateWidth, s.Row)
 
 	gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
 	row := left + s.Row.Render(strings.Repeat(" ", gap)) + right
@@ -80,33 +79,4 @@ func trackState(b git.Branch, s styles.RowStyles) string {
 	}
 
 	return strings.Join(parts, s.Row.Render(" "))
-}
-
-// relative renders a tip date as "5m", "3h", "2d" or "1w" ago.
-func relative(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "now"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h"
-	case d < 7*24*time.Hour:
-		return strconv.Itoa(int(d.Hours()/24)) + "d"
-	default:
-		return strconv.Itoa(int(d.Hours()/24/7)) + "w"
-	}
-}
-
-// padLeft right-aligns s in width columns, measured so styling doesn't skew it.
-func padLeft(s string, width int, fill lipgloss.Style) string {
-	if pad := width - lipgloss.Width(s); pad > 0 {
-		return fill.Render(strings.Repeat(" ", pad)) + s
-	}
-	return s
 }

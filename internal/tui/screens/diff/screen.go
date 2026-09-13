@@ -19,6 +19,10 @@ import (
 // ScrollTickInterval is the marquee's step. The router drives the timer.
 const ScrollTickInterval = 300 * time.Millisecond
 
+// CloseCommitMsg says the user left a commit; the router decides where that
+// goes back to.
+type CloseCommitMsg struct{}
+
 // focus identifies which pane has keyboard focus.
 type focus int
 
@@ -44,6 +48,7 @@ type Model struct {
 	scrollOffset int // how far the selected row's marquee has advanced
 	sortIndex    int // index into sortOptions
 	base         diffBase
+	commit       git.Commit // the commit being viewed, empty unless base is baseCommit
 	focus        focus
 	layout       layoutMode
 
@@ -164,6 +169,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m.selectNext(), nil
 			case key.Matches(msg, k.Open):
 				return m.setFocus(focusContent), nil
+			case key.Matches(msg, k.Back):
+				return m.closeCommit()
 			}
 			return m, nil
 		}
@@ -191,7 +198,7 @@ func (m Model) HeaderContent() (title string, segments []string) {
 		name = "gdiff"
 	}
 
-	return name, []string{styles.Muted.Render(m.branch), styles.Subtle.Render(m.base.label()), m.changeCounts()}
+	return name, []string{styles.Muted.Render(m.branch), styles.Subtle.Render(m.baseLabel()), m.changeCounts()}
 }
 
 // changeCounts is "+3 ~12 -1", leaving out any kind that isn't present.

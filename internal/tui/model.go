@@ -5,9 +5,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/JNSAPH/gdiff/internal/git"
 	"github.com/JNSAPH/gdiff/internal/tui/commandbar"
 	"github.com/JNSAPH/gdiff/internal/tui/components"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/branches"
+	"github.com/JNSAPH/gdiff/internal/tui/screens/commits"
 	diffview "github.com/JNSAPH/gdiff/internal/tui/screens/diff"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/splash"
 	"github.com/JNSAPH/gdiff/internal/tui/screens/worktrees"
@@ -22,6 +24,7 @@ const (
 	screenDiffView
 	screenWorktrees
 	screenBranches
+	screenCommits
 )
 
 // Model is the app's root state; everything else routes to a screen.
@@ -36,6 +39,7 @@ type Model struct {
 	splash     splash.Model
 	worktrees  worktrees.Model
 	branches   branches.Model
+	commits    commits.Model
 	commandBar commandbar.Model
 }
 
@@ -47,6 +51,7 @@ func NewModel(gitPath string) Model {
 		splash:     splash.New(),
 		worktrees:  worktrees.New(gitPath),
 		branches:   branches.New(gitPath),
+		commits:    commits.New(gitPath),
 		commandBar: commandbar.New(),
 	}
 }
@@ -117,10 +122,27 @@ func (m Model) showBranches() (Model, tea.Cmd) {
 	return m, m.branches.Init()
 }
 
+// showCommits switches to the commits screen. Already there is a no-op.
+func (m Model) showCommits() (Model, tea.Cmd) {
+	if m.active == screenCommits {
+		return m, nil
+	}
+
+	m.active = screenCommits
+	return m, m.commits.Init()
+}
+
+// openCommit points the diff view at one commit and shows it.
+func (m Model) openCommit(c git.Commit) (Model, tea.Cmd) {
+	m.diffView = m.diffView.OpenCommit(c)
+	return m.showDiffView()
+}
+
 // openDiffAt reopens the diff view on path — its files may have all changed.
 func (m Model) openDiffAt(path string) (Model, tea.Cmd) {
 	m.diffView = diffview.New(path)
 	m.branches = branches.New(path)
+	m.commits = commits.New(path)
 	m.worktrees = m.worktrees.SetActive(path)
 
 	// The new diffView is unsized until the router hands it space.
@@ -145,6 +167,7 @@ func (m Model) resize(width, height int) (Model, tea.Cmd) {
 	m.splash, _ = m.splash.Update(inner)
 	m.worktrees, _ = m.worktrees.Update(inner)
 	m.branches, _ = m.branches.Update(inner)
+	m.commits, _ = m.commits.Update(inner)
 	m.diffView, cmd = m.diffView.Update(inner)
 	return m, cmd
 }
@@ -159,6 +182,8 @@ func (m Model) updateActiveScreen(msg tea.Msg) (Model, tea.Cmd) {
 		m.worktrees, cmd = m.worktrees.Update(msg)
 	case screenBranches:
 		m.branches, cmd = m.branches.Update(msg)
+	case screenCommits:
+		m.commits, cmd = m.commits.Update(msg)
 	default:
 		m.diffView, cmd = m.diffView.Update(msg)
 	}
@@ -176,6 +201,8 @@ func (m Model) runCommand(value string) (Model, tea.Cmd) {
 		return m.showWorktrees()
 	case commandbar.CommandBranches:
 		return m.showBranches()
+	case commandbar.CommandCommits:
+		return m.showCommits()
 	case commandbar.CommandDiff:
 		return m.showDiffView()
 	case commandbar.CommandAccept:

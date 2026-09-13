@@ -109,7 +109,7 @@ func tabLabel(file git.FileChange, selected bool, room int) string {
 
 	glyph := s.Glyph.Foreground(components.ChangeTypeColor(file.Type)).Render(file.Type.Symbol())
 
-	return bar + glyph + s.Row.Render(" ") + s.Name.Render(truncateTail(baseName(file), room)) + s.Row.Render(" ")
+	return bar + glyph + s.Row.Render(" ") + s.Name.Render(components.TruncateTail(baseName(file), room)) + s.Row.Render(" ")
 }
 
 // tabWindow is the run of tabs that fits, filling forward from the cursor.

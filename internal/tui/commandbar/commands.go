@@ -7,6 +7,7 @@ const (
 	CommandQuit      = "quit"
 	CommandWorktrees = "worktrees"
 	CommandBranches  = "branches"
+	CommandCommits   = "commits"
 	CommandDiff      = "diff"
 	CommandAccept    = "checkpoint/accept"      // the selected file only
 	CommandAcceptAll = "checkpoint/accept-all"  // every pending file
@@ -23,6 +24,7 @@ var commandList = []command{
 	{CommandQuit, "quit gdiff"},
 	{CommandWorktrees, "browse worktrees"},
 	{CommandBranches, "browse branches"},
+	{CommandCommits, "browse commits"},
 	{CommandDiff, "back to the diff view"},
 	{CommandAccept, "accept the selected file"},
 	{CommandAcceptAll, "accept every pending file"},
